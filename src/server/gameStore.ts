@@ -610,11 +610,13 @@ function nextAvailableColour(participants: LobbyParticipant[]): Colour {
 
 function getTurnControllers(game: GameState): TurnControllers {
   const plusTeamColor = COLOURS[game.turnIndex];
-  const teamPlayers = game.players.filter((p) => p.team === plusTeamColor);
+  const minusTeamColor = COLOURS[COLOURS.length - 1 - game.turnIndex];
+  const plusTeamPlayers = game.players.filter((p) => p.team === plusTeamColor);
+  const minusTeamPlayers = game.players.filter((p) => p.team === minusTeamColor);
 
   return {
-    plusPlayer: teamPlayers[0],
-    minusPlayer: teamPlayers[1] || teamPlayers[0],
+    plusPlayer: plusTeamPlayers[0],
+    minusPlayer: minusTeamPlayers[1] || minusTeamPlayers[0],
   };
 }
 

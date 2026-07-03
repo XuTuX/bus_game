@@ -87,10 +87,12 @@ export default function DealerRoom({
   let resolvedPlayerId = playerId || "";
 
   if (roomBus && initialGame && publicState?.status !== "LOBBY") {
-    const currentTeam = COLOURS[initialGame.turnIndex];
-    const teamPlayers = initialGame.players.filter((p) => p.team === currentTeam);
-    const plusPlayer = teamPlayers[0];
-    const minusPlayer = teamPlayers[1] || teamPlayers[0];
+    const plusTeam = COLOURS[initialGame.turnIndex];
+    const minusTeam = COLOURS[COLOURS.length - 1 - initialGame.turnIndex];
+    const plusTeamPlayers = initialGame.players.filter((p) => p.team === plusTeam);
+    const minusTeamPlayers = initialGame.players.filter((p) => p.team === minusTeam);
+    const plusPlayer = plusTeamPlayers[0];
+    const minusPlayer = minusTeamPlayers[1] || minusTeamPlayers[0];
 
     resolvedPlayerId =
       roomBus === BusType.PLUS ? plusPlayer?.id || "" : minusPlayer?.id || "";
@@ -100,6 +102,7 @@ export default function DealerRoom({
   
   // Simulated state for step-by-step client-side movement animation
   const [animatedGame, setAnimatedGame] = useState<GameState | null>(null);
+  const [submittedPreviewGame, setSubmittedPreviewGame] = useState<GameState | null>(null);
 
   // Movement selections
   const [chosenBus, setChosenBus] = useState<BusType>(BusType.PLUS);
@@ -161,6 +164,9 @@ export default function DealerRoom({
     setActionTarget(null);
     setErrorMsg("");
     setAnimatedGame(null);
+    if (publicState?.status !== "CHOOSING") {
+      setSubmittedPreviewGame(null);
+    }
   }, [resolvedPlayerId, publicState?.status]);
 
   if (!publicState || !publicState.game) {
@@ -230,7 +236,9 @@ export default function DealerRoom({
       : status === "ACTION_PHASE" && isMinusController && !isPlusController
         ? BusType.MINUS
         : chosenBus);
-  const activeBusPos = game.buses[activeBusType].pos;
+  const displayGame =
+    animatedGame || (status === "CHOOSING" ? submittedPreviewGame : null) || game;
+  const activeBusPos = displayGame.buses[activeBusType].pos;
   const roomBusLabel = selectedBus === BusType.PLUS ? "PLUS" : "MINUS";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
@@ -299,6 +307,7 @@ export default function DealerRoom({
       const selectedWithBuses = selectedMoves.map((kind) => ({ kind, bus: activeBusType }));
       const moveActions = getMovesWithIndices(hand, selectedWithBuses);
       await submitAction(roomCode, resolvedPlayerId, moveActions, activeBusType);
+      setSubmittedPreviewGame(JSON.parse(JSON.stringify(animClone)) as GameState);
       setSelectedMoves([]);
     } catch (e: any) {
       setErrorMsg(e.message || "이동 제출에 실패했습니다.");
@@ -394,7 +403,7 @@ export default function DealerRoom({
               <span>버스 위치와 격자를 확인하세요</span>
             )}
           </div>
-          <Board game={animatedGame || game} showFacing={false} />
+          <Board game={displayGame} showFacing={false} />
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
