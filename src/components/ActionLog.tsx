@@ -101,11 +101,19 @@ export default function ActionLog({ logs }: { logs: LogEntry[] }) {
                     >
                       {action.bus === BusType.PLUS ? "＋" : "ー"}
                     </span>
-                    <span style={{ fontWeight: 600 }}>{action.cardLabel}</span>
+                    <span style={{ fontWeight: 600 }}>{action.actionLabel}</span>
                     <span>{action.applied ? "✓" : `✗ ${action.reason}`}</span>
-                    {action.regionsScored > 0 && (
-                      <span style={{ color: "var(--bus-plus)", fontWeight: "bold" }}>
-                        🏆 ×{action.regionsScored}
+                    {action.scoreGained !== 0 && (
+                      <span
+                        style={{
+                          color:
+                            action.scoreGained > 0
+                              ? "var(--bus-plus)"
+                              : "var(--bus-minus)",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {action.scoreGained > 0 ? `+${action.scoreGained}` : action.scoreGained}
                       </span>
                     )}
                   </div>

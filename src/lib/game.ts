@@ -24,6 +24,7 @@ export type Rng = () => number;
 
 export interface Tile {
   colour: Colour;
+  scoreBonus?: number;
 }
 
 export interface Card {
@@ -68,15 +69,27 @@ export interface GameState {
   teamScores: Record<Colour, number>;
 }
 
-export interface TurnAction {
+export type TurnActionKind = "MOVE" | "BUFF_TILE" | "SWAP_TILE";
+
+export interface MoveTurnAction {
+  type?: "MOVE";
   bus: BusType;
   cardIndex: number;
 }
+
+export interface TileTurnAction {
+  type: "BUFF_TILE" | "SWAP_TILE";
+  bus: BusType;
+}
+
+export type TurnAction = MoveTurnAction | TileTurnAction;
 
 export interface StepResult {
   applied: boolean;
   reason?: string;
   regions: Region[];
+  path?: Coord[];
+  scoreGained?: number;
 }
 
 export const BOARD_SIZE = 9;
@@ -87,6 +100,9 @@ export const COLOURS = [
   Colour.Green,
   Colour.Blue,
 ] as const;
+
+export const MAX_PLAYERS_PER_COLOUR = 2;
+export const MAX_PLAYERS = COLOURS.length * MAX_PLAYERS_PER_COLOUR;
 
 const TEAM_IDS = ["A", "B", "C", "D", "E"] as const;
 
@@ -149,20 +165,19 @@ export function step(
 ): StepResult {
   if (card.kind === "LEFT" || card.kind === "RIGHT") {
     bus.facing = rotate(bus.facing, card.kind === "LEFT" ? "L" : "R");
-    const regions = floodFillRegions(bus, board, busType);
-    return { applied: true, regions };
+    return { applied: true, regions: [], path: [] };
   }
 
   const distance = straightDistance(card.kind);
   const path = move(bus.pos, bus.facing, distance);
   if (!legalMovePath(path, board.length)) {
-    return { applied: false, reason: "off-board", regions: [] };
+    return { applied: false, reason: "off-board", regions: [], path };
   }
 
   const segments = pathToWallSegments(bus.pos, path);
   const existing = [...bus.walls, ...otherWalls];
   if (segments.some((segment) => wallConflicts(segment, existing))) {
-    return { applied: false, reason: "wall-conflict", regions: [] };
+    return { applied: false, reason: "wall-conflict", regions: [], path };
   }
 
   for (const segment of segments) {
@@ -170,8 +185,7 @@ export function step(
   }
   bus.pos = { ...path[path.length - 1] };
 
-  const regions = floodFillRegions(bus, board, busType);
-  return { applied: true, regions };
+  return { applied: true, regions: [], path };
 }
 
 export function floodFillRegions(
@@ -284,25 +298,28 @@ export function runTurn(player: Player, actions: TurnAction[], game: GameState):
   if (isGameOver(game)) {
     throw new Error("Game is already over");
   }
-  if (actions.length > 3) {
-    throw new Error("A turn may play at most 3 cards");
-  }
   const active = nextPlayer(game);
   if (active.id !== player.id) {
     throw new Error(`It is ${active.id}'s turn, not ${player.id}'s`);
   }
-  validateActionIndexes(active.hand, actions);
+  validateTurnActions(active.hand, actions);
 
   const results: StepResult[] = [];
-  for (const action of actions) {
+  if (actions.length === 1 && isTileAction(actions[0])) {
+    results.push(runTileAction(active, actions[0], game));
+    game.turnIndex = (game.turnIndex + 1) % game.players.length;
+    return results;
+  }
+
+  for (const action of actions as MoveTurnAction[]) {
     const [card] = active.hand.splice(action.cardIndex, 1);
     const bus = game.buses[action.bus];
     const otherWalls = Object.entries(game.buses)
       .filter(([type]) => type !== action.bus)
       .flatMap(([, state]) => state.walls);
     const result = step(bus, card, game.board, action.bus, otherWalls);
-    for (const region of result.regions) {
-      scoreRegion(region, game);
+    if (result.applied && result.path) {
+      result.scoreGained = scorePathTiles(result.path, action.bus, game);
     }
     results.push(result);
   }
@@ -311,14 +328,67 @@ export function runTurn(player: Player, actions: TurnAction[], game: GameState):
   return results;
 }
 
-function validateActionIndexes(hand: Card[], actions: TurnAction[]): void {
+function validateTurnActions(hand: Card[], actions: TurnAction[]): void {
+  if (actions.length === 0) {
+    return;
+  }
+  const hasTileAction = actions.some(isTileAction);
+  if (hasTileAction) {
+    if (actions.length !== 1 || !isTileAction(actions[0])) {
+      throw new Error("A tile action must be played alone");
+    }
+    return;
+  }
+  if (actions.length > 3) {
+    throw new Error("A turn may play at most 3 cards");
+  }
+
   let remaining = hand.length;
-  for (const action of actions) {
+  for (const action of actions as MoveTurnAction[]) {
     if (action.cardIndex < 0 || action.cardIndex >= remaining) {
       throw new Error(`Invalid card index ${action.cardIndex}`);
     }
     remaining -= 1;
   }
+}
+
+function isTileAction(action: TurnAction): action is TileTurnAction {
+  return action.type === "BUFF_TILE" || action.type === "SWAP_TILE";
+}
+
+function runTileAction(player: Player, action: TileTurnAction, game: GameState): StepResult {
+  const bus = game.buses[action.bus];
+  const tile = game.board[bus.pos.y]?.[bus.pos.x];
+  if (!tile) {
+    return { applied: false, reason: "invalid-tile", regions: [] };
+  }
+
+  if (action.type === "BUFF_TILE") {
+    if (tile.colour !== player.team) {
+      return { applied: false, reason: "not-your-tile", regions: [] };
+    }
+    tile.scoreBonus = (tile.scoreBonus ?? 0) + 1;
+    return { applied: true, regions: [] };
+  }
+
+  tile.colour = player.team;
+  tile.scoreBonus = 0;
+  return { applied: true, regions: [] };
+}
+
+function scorePathTiles(path: Coord[], bus: BusType, game: GameState): number {
+  let total = 0;
+  const sign = bus === BusType.MINUS ? -1 : 1;
+  for (const coord of path) {
+    const tile = game.board[coord.y]?.[coord.x];
+    if (!tile) {
+      continue;
+    }
+    const score = 1 + (tile.scoreBonus ?? 0);
+    game.teamScores[tile.colour] += score * sign;
+    total += score * sign;
+  }
+  return total;
 }
 
 export function nextPlayer(game: GameState): Player {

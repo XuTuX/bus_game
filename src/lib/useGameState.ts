@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
-import { type RoomState } from "@/server/gameStore";
-import { type Card } from "@/lib/game";
+import { type LobbyParticipant, type RoomState } from "@/server/gameStore";
+import { type Card, type Colour, type TurnAction } from "@/lib/game";
 
 export type PublicStateResult = {
   game: RoomState["game"];
+  participants: LobbyParticipant[];
   logs: RoomState["logs"];
   status: RoomState["status"];
-  activePlayerId: string;
+  activePlayerId: string | null;
 };
 
 export type PrivateStateResult = {
   hand: Card[];
   isMyTurn: boolean;
   status: RoomState["status"];
-  team: string;
+  team?: Colour;
+  playerName?: string;
 };
 
 export function usePublicGame(roomCode: string) {
@@ -45,10 +47,13 @@ export function usePrivateGame(roomCode: string, playerId: string) {
   const [data, setData] = useState<PrivateStateResult | null>(null);
 
   useEffect(() => {
-    if (!roomCode || !playerId) return;
+    if (!roomCode || !playerId) {
+      setData(null);
+      return;
+    }
     const fetchState = async () => {
       try {
-        const res = await fetch(`/api/game/${roomCode}/dealer/${playerId}`);
+        const res = await fetch(`/api/game/${roomCode}/player/${playerId}`);
         if (res.ok) {
           const json = await res.json();
           setData(json);
@@ -69,7 +74,7 @@ export function usePrivateGame(roomCode: string, playerId: string) {
 export async function submitAction(
   roomCode: string,
   playerId: string,
-  actions: { bus: string; cardIndex: number }[]
+  actions: TurnAction[]
 ) {
   const res = await fetch(`/api/game/${roomCode}/action`, {
     method: "POST",
@@ -96,5 +101,48 @@ export async function adminAction(
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || "Failed to perform admin action");
+  }
+}
+
+export async function adminAddPlayer(roomCode: string, name: string) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "add_player", name }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to add player");
+  }
+}
+
+export async function adminRemovePlayer(roomCode: string, playerId: string) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "remove_player", playerId }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to remove player");
+  }
+}
+
+export async function adminSetPlayerColour(
+  roomCode: string,
+  playerId: string,
+  colour: Colour
+) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "set_player_colour", playerId, colour }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to set player colour");
   }
 }

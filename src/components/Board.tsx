@@ -1,10 +1,10 @@
 import { BusType, BOARD_SIZE, type GameState, type Wall } from "@/lib/game";
 
-const FACING_ARROWS: Record<string, string> = {
-  N: "↑",
-  E: "→",
-  S: "↓",
-  W: "←",
+const FACING_ROTATION: Record<string, number> = {
+  N: -90,
+  E: 0,
+  S: 90,
+  W: 180,
 };
 
 export default function Board({ game }: { game: GameState }) {
@@ -41,7 +41,11 @@ export default function Board({ game }: { game: GameState }) {
               className={`tile tile-${tile.colour}${
                 scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
               }`}
-            />
+            >
+              {tile.scoreBonus ? (
+                <span className="tile-bonus">+{1 + tile.scoreBonus}</span>
+              ) : null}
+            </div>
           ))
         )}
       </div>
@@ -76,9 +80,10 @@ export default function Board({ game }: { game: GameState }) {
 
       {Object.entries(game.buses).map(([busType, busState]) => {
         const step = tileSize + tileGap;
-        const left = 12 + busState.pos.x * step + tileSize / 2 - 14;
-        const top = 12 + busState.pos.y * step + tileSize / 2 - 14;
+        const left = 12 + busState.pos.x * step + tileSize / 2 - 19;
+        const top = 12 + busState.pos.y * step + tileSize / 2 - 13;
         const offset = busType === BusType.PLUS ? -4 : 4;
+        const rotation = FACING_ROTATION[busState.facing] ?? 0;
 
         return (
           <div
@@ -87,9 +92,13 @@ export default function Board({ game }: { game: GameState }) {
             style={{
               left: left + offset,
               top: top + offset,
+              transform: `rotate(${rotation}deg)`,
             }}
           >
-            {FACING_ARROWS[busState.facing]}
+            <span className="bus-marker-label">
+              {busType === BusType.PLUS ? "+" : "-"}
+            </span>
+            <span className="bus-marker-head" />
           </div>
         );
       })}

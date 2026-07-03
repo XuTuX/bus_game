@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminStartGame, adminStartTurn, adminRevealTurn, adminNext } from "@/server/gameStore";
+import {
+  adminAddParticipant,
+  adminNext,
+  adminRemoveParticipant,
+  adminRevealTurn,
+  adminSetParticipantColour,
+  adminStartGame,
+  adminStartTurn,
+} from "@/server/gameStore";
+import { Colour } from "@/lib/game";
 
 export async function POST(
   request: NextRequest,
@@ -8,9 +17,31 @@ export async function POST(
   try {
     const { roomCode } = await params;
     const body = await request.json();
-    const { action } = body as { action: "start_game" | "start" | "reveal" | "next" };
+    const { action } = body as {
+      action:
+        | "add_player"
+        | "remove_player"
+        | "set_player_colour"
+        | "start_game"
+        | "start"
+        | "reveal"
+        | "next";
+      name?: string;
+      playerId?: string;
+      colour?: Colour;
+    };
 
-    if (action === "start_game") {
+    if (action === "add_player") {
+      adminAddParticipant(roomCode, String(body.name ?? ""));
+    } else if (action === "remove_player") {
+      adminRemoveParticipant(roomCode, String(body.playerId ?? ""));
+    } else if (action === "set_player_colour") {
+      adminSetParticipantColour(
+        roomCode,
+        String(body.playerId ?? ""),
+        body.colour as Colour
+      );
+    } else if (action === "start_game") {
       adminStartGame(roomCode);
     } else if (action === "start") {
       adminStartTurn(roomCode);
