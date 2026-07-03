@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, use, useState } from "react";
+import { FormEvent, use, useEffect, useState } from "react";
 import Board from "@/components/Board";
 import RoomPageLinks from "@/components/RoomPageLinks";
 import ScoreBoard from "@/components/ScoreBoard";
@@ -10,7 +10,9 @@ import {
   adminAction,
   adminAddPlayer,
   adminRemovePlayer,
+  adminSetTimers,
   adminSetPlayerColour,
+  getPhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
 import { COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
@@ -49,7 +51,21 @@ export default function AdminPage({
   const [playerName, setPlayerName] = useState("");
   const [editingPlayers, setEditingPlayers] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
+  const [savingTimers, setSavingTimers] = useState(false);
+  const [timerDirty, setTimerDirty] = useState(false);
+  const [moveMinutes, setMoveMinutes] = useState("3");
+  const [actionMinutes, setActionMinutes] = useState("2");
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (!state?.timerSettings || timerDirty) return;
+    setMoveMinutes(String(Math.round(state.timerSettings.movePhaseSeconds / 60)));
+    setActionMinutes(String(Math.round(state.timerSettings.actionPhaseSeconds / 60)));
+  }, [
+    state?.timerSettings?.movePhaseSeconds,
+    state?.timerSettings?.actionPhaseSeconds,
+    timerDirty,
+  ]);
 
   if (!state) {
     return (
@@ -60,6 +76,7 @@ export default function AdminPage({
   }
 
   const { status, game, participants, logs, activePlayerNames } = state;
+  const phaseTimeLabel = getPhaseTimeLabel(state);
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
     action: "start_game" | "start" | "reveal" | "next"
@@ -118,6 +135,25 @@ export default function AdminPage({
       setErrorMsg(error.message || "색상 변경에 실패했습니다.");
     } finally {
       setEditingPlayers(false);
+    }
+  };
+
+  const handleTimerSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (savingTimers) return;
+
+    setSavingTimers(true);
+    setErrorMsg("");
+    try {
+      await adminSetTimers(roomCode, {
+        movePhaseSeconds: Math.round(Number(moveMinutes) * 60),
+        actionPhaseSeconds: Math.round(Number(actionMinutes) * 60),
+      });
+      setTimerDirty(false);
+    } catch (error: any) {
+      setErrorMsg(error.message || "시간 설정 저장에 실패했습니다.");
+    } finally {
+      setSavingTimers(false);
     }
   };
 
@@ -187,7 +223,53 @@ export default function AdminPage({
               <span>상태</span>
               <strong>{STATUS_LABELS[status]}</strong>
             </div>
+            {phaseTimeLabel && (
+              <div>
+                <span>남은 시간</span>
+                <strong>{phaseTimeLabel}</strong>
+              </div>
+            )}
           </div>
+
+          <form className="timer-settings-form" onSubmit={handleTimerSubmit}>
+            <label>
+              <span>이동 시간</span>
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={moveMinutes}
+                disabled={savingTimers}
+                onChange={(event) => {
+                  setTimerDirty(true);
+                  setMoveMinutes(event.target.value);
+                }}
+              />
+              <small>분</small>
+            </label>
+            <label>
+              <span>행동 시간</span>
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={actionMinutes}
+                disabled={savingTimers}
+                onChange={(event) => {
+                  setTimerDirty(true);
+                  setActionMinutes(event.target.value);
+                }}
+              />
+              <small>분</small>
+            </label>
+            <button
+              className="btn btn-primary compact-btn"
+              disabled={savingTimers || !timerDirty}
+              type="submit"
+            >
+              {savingTimers ? "저장 중" : "시간 저장"}
+            </button>
+          </form>
 
           {errorMsg && <div className="error-box">{errorMsg}</div>}
 

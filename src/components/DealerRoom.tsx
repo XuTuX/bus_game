@@ -17,7 +17,12 @@ import {
   wallConflicts,
   type GameState,
 } from "@/lib/game";
-import { submitAction, usePrivateGame, usePublicGame } from "@/lib/useGameState";
+import {
+  getPhaseTimeLabel,
+  submitAction,
+  usePrivateGame,
+  usePublicGame,
+} from "@/lib/useGameState";
 
 const CARD_ICONS: Record<CardKind, string> = {
   STRAIGHT1: "➡️",
@@ -181,6 +186,7 @@ export default function DealerRoom({
 
   const game = publicState.game as GameState;
   const { status } = publicState;
+  const phaseTimeLabel = getPhaseTimeLabel(publicState);
   const activePlayer = game.players.find((player) => player.id === resolvedPlayerId);
   const hand = privateState?.hand ?? [];
   const activeTeam = privateState?.team ?? activePlayer?.team;
@@ -384,6 +390,7 @@ export default function DealerRoom({
           <h1 className="brand-font">{roomTitle}</h1>
           <p className="header-subtitle">
             <strong>{roomTitle}</strong> · 방 코드 <strong>{roomCode}</strong> · {STATUS_TEXT[status] || STATUS_TEXT.CHOOSING}
+            {phaseTimeLabel ? ` · 남은 시간 ${phaseTimeLabel}` : ""}
           </p>
         </div>
         <Link href={`/game/${roomCode}`} className="btn btn-ghost" target="_blank" rel="noopener noreferrer">
@@ -403,7 +410,7 @@ export default function DealerRoom({
               <span>버스 위치와 격자를 확인하세요</span>
             )}
           </div>
-          <Board game={displayGame} showFacing={false} />
+          <Board game={displayGame} showFacing={!!animatedGame} />
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>

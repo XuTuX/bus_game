@@ -33,3 +33,33 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # bus_game
+
+## Vercel + Redis deployment
+
+This app stores live room state in Redis when Redis environment variables are
+present. Without them, it falls back to local memory for development.
+
+Create an Upstash Redis database, then set these environment variables in
+Vercel:
+
+```bash
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+ROOM_TTL_SECONDS=43200
+MOVE_PHASE_SECONDS=180
+ACTION_PHASE_SECONDS=120
+```
+
+- `ROOM_TTL_SECONDS`: how long a room is kept after the last saved state.
+  The default is 12 hours.
+- `MOVE_PHASE_SECONDS`: countdown shown during the move-card phase.
+  The default is 3 minutes.
+- `ACTION_PHASE_SECONDS`: countdown shown during the action phase.
+  The default is 2 minutes.
+
+Vercel KV-compatible names are also supported:
+
+```bash
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
+```

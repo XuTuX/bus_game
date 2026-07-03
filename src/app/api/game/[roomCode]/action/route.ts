@@ -22,7 +22,7 @@ export async function POST(
       );
     }
 
-    submitTurn(roomCode, playerId, actions || [], bus);
+    await submitTurn(roomCode, playerId, actions || [], bus);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

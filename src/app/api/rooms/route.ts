@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateRoom, hasRoom } from "@/server/gameStore";
+import { createRoom, hasRoom } from "@/server/gameStore";
 
 function generateRoomCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -12,13 +12,10 @@ function generateRoomCode() {
 
 export async function POST(request: NextRequest) {
   let roomCode = generateRoomCode();
-  // Ensure uniqueness
-  while (hasRoom(roomCode)) {
+  while (!(await createRoom(roomCode))) {
     roomCode = generateRoomCode();
   }
-  // Initialize the room in the store
-  getOrCreateRoom(roomCode);
-  
+
   return NextResponse.json({ roomCode });
 }
 
@@ -30,7 +27,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Code is required" }, { status: 400 });
   }
 
-  if (hasRoom(code)) {
+  if (await hasRoom(code)) {
     return NextResponse.json({ exists: true });
   } else {
     return NextResponse.json({ exists: false }, { status: 404 });

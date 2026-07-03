@@ -4,7 +4,7 @@ import { use } from "react";
 import ActionLog from "@/components/ActionLog";
 import Board from "@/components/Board";
 import ScoreBoard from "@/components/ScoreBoard";
-import { usePublicGame } from "@/lib/useGameState";
+import { getPhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
 import { MAX_PLAYERS, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
@@ -40,6 +40,7 @@ export default function PublicBoardPage({
   }
 
   const { game, participants, logs, status, activePlayerNames } = state;
+  const phaseTimeLabel = getPhaseTimeLabel(state);
 
   return (
     <div className="public-layout">
@@ -55,6 +56,7 @@ export default function PublicBoardPage({
           <div className="status-metadata">
             <span>라운드 {Math.min(game.roundIndex + 1, 5)} / 5</span>
             <span>현재 차례 {activePlayerNames || "-"}</span>
+            {phaseTimeLabel && <span>남은 시간 {phaseTimeLabel}</span>}
           </div>
         </div>
 
@@ -109,7 +111,10 @@ export default function PublicBoardPage({
       <main className="public-main">
         <div className="public-board-header">
           <h2 className="brand-font">버스 보드판</h2>
-          <div className="board-status-banner">{STATUS_LABELS[status]}</div>
+          <div className="board-status-banner">
+            {STATUS_LABELS[status]}
+            {phaseTimeLabel ? ` · ${phaseTimeLabel}` : ""}
+          </div>
         </div>
         <Board game={game} />
       </main>

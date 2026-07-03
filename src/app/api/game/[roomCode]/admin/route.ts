@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   adminAddParticipant,
   adminRemoveParticipant,
+  adminSetRoomTimers,
   adminSetParticipantColour,
   adminStartGame,
   adminStartTurn,
@@ -20,27 +21,35 @@ export async function POST(
         | "add_player"
         | "remove_player"
         | "set_player_colour"
+        | "set_timers"
         | "start_game"
         | "start";
       name?: string;
       playerId?: string;
       colour?: Colour;
+      movePhaseSeconds?: number;
+      actionPhaseSeconds?: number;
     };
 
     if (action === "add_player") {
-      adminAddParticipant(roomCode, String(body.name ?? ""));
+      await adminAddParticipant(roomCode, String(body.name ?? ""));
     } else if (action === "remove_player") {
-      adminRemoveParticipant(roomCode, String(body.playerId ?? ""));
+      await adminRemoveParticipant(roomCode, String(body.playerId ?? ""));
     } else if (action === "set_player_colour") {
-      adminSetParticipantColour(
+      await adminSetParticipantColour(
         roomCode,
         String(body.playerId ?? ""),
         body.colour as Colour
       );
+    } else if (action === "set_timers") {
+      await adminSetRoomTimers(roomCode, {
+        movePhaseSeconds: Number(body.movePhaseSeconds),
+        actionPhaseSeconds: Number(body.actionPhaseSeconds),
+      });
     } else if (action === "start_game") {
-      adminStartGame(roomCode);
+      await adminStartGame(roomCode);
     } else if (action === "start") {
-      adminStartTurn(roomCode);
+      await adminStartTurn(roomCode);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

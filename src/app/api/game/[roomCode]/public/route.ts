@@ -6,6 +6,6 @@ export async function GET(
   { params }: { params: Promise<{ roomCode: string }> }
 ) {
   const { roomCode } = await params;
-  const state = getPublicState(roomCode);
+  const state = await getPublicState(roomCode);
   return NextResponse.json(state);
 }

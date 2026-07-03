@@ -575,6 +575,46 @@ h1, h2, h3, .brand-font {
   font-size: 1.1rem;
 }
 
+.timer-settings-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding: 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.timer-settings-form label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.timer-settings-form label > span {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.timer-settings-form input {
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+}
+
+.timer-settings-form small {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 .master-section {
   text-align: left;
 }
@@ -1163,6 +1203,10 @@ h1, h2, h3, .brand-font {
   }
 
   .admin-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .timer-settings-form {
     grid-template-columns: 1fr;
   }
 

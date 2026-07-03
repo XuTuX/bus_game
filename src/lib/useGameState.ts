@@ -1,6 +1,20 @@
 import { useState, useEffect } from "react";
-import { type LobbyParticipant, type RoomState } from "@/server/gameStore";
+import {
+  type LobbyParticipant,
+  type RoomState,
+  type RoomTimerSettings,
+} from "@/server/gameStore";
 import { type Card, type Colour, type TurnAction, BusType } from "@/lib/game";
+
+export type TimingState = {
+  serverNow: number;
+  receivedAt: number;
+  roomExpiresAt: number;
+  phaseStartedAt?: number;
+  phaseDeadlineAt?: number;
+  phaseDurationSeconds?: number;
+  timerSettings: RoomTimerSettings;
+};
 
 export type PublicStateResult = {
   game: RoomState["game"];
@@ -16,7 +30,7 @@ export type PublicStateResult = {
     PLUS: boolean;
     MINUS: boolean;
   };
-};
+} & TimingState;
 
 export type PrivateStateResult = {
   hand: Card[];
@@ -26,7 +40,7 @@ export type PrivateStateResult = {
   playerName?: string;
   isPlusController?: boolean;
   isMinusController?: boolean;
-};
+} & TimingState;
 
 export function usePublicGame(roomCode: string) {
   const [data, setData] = useState<PublicStateResult | null>(null);
@@ -38,7 +52,7 @@ export function usePublicGame(roomCode: string) {
         const res = await fetch(`/api/game/${roomCode}/public`);
         if (res.ok) {
           const json = await res.json();
-          setData(json);
+          setData({ ...json, receivedAt: Date.now() });
         }
       } catch (e) {
         // ignore network errors for polling
@@ -66,7 +80,7 @@ export function usePrivateGame(roomCode: string, playerId: string) {
         const res = await fetch(`/api/game/${roomCode}/player/${playerId}`);
         if (res.ok) {
           const json = await res.json();
-          setData(json);
+          setData({ ...json, receivedAt: Date.now() });
         }
       } catch (e) {
         // ignore network errors for polling
@@ -79,6 +93,21 @@ export function usePrivateGame(roomCode: string, playerId: string) {
   }, [roomCode, playerId]);
 
   return data;
+}
+
+export function getPhaseTimeLabel(state?: TimingState | null): string | null {
+  if (!state?.phaseDeadlineAt) {
+    return null;
+  }
+
+  const elapsedSinceResponse = Date.now() - state.receivedAt;
+  const estimatedServerNow = state.serverNow + elapsedSinceResponse;
+  const remainingMs = Math.max(0, state.phaseDeadlineAt - estimatedServerNow);
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export async function submitAction(
@@ -155,5 +184,21 @@ export async function adminSetPlayerColour(
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || "Failed to set player colour");
+  }
+}
+
+export async function adminSetTimers(
+  roomCode: string,
+  timerSettings: RoomTimerSettings
+) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "set_timers", ...timerSettings }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to set timers");
   }
 }

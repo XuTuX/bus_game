@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ roomCode: string; playerId: string }> }
 ) {
   const { roomCode, playerId } = await params;
-  const state = getPrivateState(roomCode, playerId);
+  const state = await getPrivateState(roomCode, playerId);
   if (!state || !state.playerName) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
   }
