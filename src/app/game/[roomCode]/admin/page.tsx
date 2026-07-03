@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, use, useState } from "react";
+import Board from "@/components/Board";
 import RoomPageLinks from "@/components/RoomPageLinks";
+import ScoreBoard from "@/components/ScoreBoard";
+import ActionLog from "@/components/ActionLog";
 import {
   adminAction,
   adminAddPlayer,
@@ -31,9 +34,8 @@ const TEAM_LABELS: Record<Colour, string> = {
 const STATUS_LABELS = {
   LOBBY: "참가자 입력",
   WAITING: "턴 시작 대기",
-  CHOOSING: "딜러룸 입력 중",
-  SUBMITTED: "처리 중",
-  REVEALED: "결과 공개됨",
+  CHOOSING: "이동 카드 선택 중",
+  ACTION_PHASE: "행동 선택 중",
   GAME_OVER: "게임 종료",
 } as const;
 
@@ -57,7 +59,7 @@ export default function AdminPage({
     );
   }
 
-  const { status, activePlayerId, game, participants } = state;
+  const { status, activePlayerId, game, participants, logs } = state;
   const activePlayer = game.players.find((p) => p.id === activePlayerId);
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
@@ -130,16 +132,24 @@ export default function AdminPage({
           </p>
         </div>
         <div className="header-actions">
-          <Link href={`/dealer/${roomCode}`} className="btn btn-primary">
+          <Link href={`/dealer/${roomCode}`} className="btn btn-primary" target="_blank" rel="noopener noreferrer">
             딜러룸
           </Link>
-          <Link href={`/game/${roomCode}`} className="btn btn-ghost">
+          <Link href={`/game/${roomCode}`} className="btn btn-ghost" target="_blank" rel="noopener noreferrer">
             공개판
           </Link>
         </div>
       </header>
 
       <main className="admin-main">
+        <section className="dealer-board-pane">
+          <div className="dealer-pane-heading">
+            <h2 className="brand-font">마스터 보드판</h2>
+            <span>버스의 머리 방향이 표시됩니다</span>
+          </div>
+          <Board game={game} showFacing={true} />
+        </section>
+
         <section className="dealer-panel admin-control-panel">
           <div className="admin-summary">
             <div>
@@ -205,21 +215,17 @@ export default function AdminPage({
             </button>
           )}
 
-          {status === "CHOOSING" && (
+          {(status === "CHOOSING" || status === "ACTION_PHASE") && (
             <div className="master-waiting">
-              <h2 className="brand-font">딜러룸 입력 중</h2>
+              <h2 className="brand-font">
+                {status === "CHOOSING" ? "딜러룸 이동 입력 중" : "딜러룸 행동 입력 중"}
+              </h2>
               <p>
-                {activePlayer?.name ?? activePlayer?.id} 님이 제출하면 바로 공개판에 반영되고 다음 차례로 넘어갑니다.
+                {activePlayer?.name ?? activePlayer?.id} 님이 제출하면 바로 공개판에 반영됩니다.
               </p>
             </div>
           )}
 
-          {(status === "SUBMITTED" || status === "REVEALED") && (
-            <div className="master-waiting">
-              <h2 className="brand-font">자동 진행 중</h2>
-              <p>새 흐름에서는 딜러룸 제출 즉시 공개판에 반영되고 다음 차례로 넘어갑니다.</p>
-            </div>
-          )}
 
           {status === "GAME_OVER" && (
             <div className="master-waiting">
@@ -292,6 +298,14 @@ export default function AdminPage({
               ))
             )}
           </div>
+          {status !== "LOBBY" && (
+            <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>
+              <hr style={{ border: "none", borderTop: "1px solid var(--border-light)" }} />
+              <ScoreBoard game={game} showBusStatus={true} />
+              <hr style={{ border: "none", borderTop: "1px solid var(--border-light)" }} />
+              <ActionLog logs={logs} />
+            </div>
+          )}
         </section>
       </main>
     </div>

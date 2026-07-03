@@ -15,7 +15,13 @@ const FACING_LABELS: Record<string, string> = {
   W: "서",
 };
 
-export default function ScoreBoard({ game }: { game: GameState }) {
+export default function ScoreBoard({
+  game,
+  showBusStatus = true,
+}: {
+  game: GameState;
+  showBusStatus?: boolean;
+}) {
   const sortedColours = [...COLOURS].sort(
     (a, b) => game.teamScores[b] - game.teamScores[a]
   );
@@ -45,40 +51,44 @@ export default function ScoreBoard({ game }: { game: GameState }) {
         })}
       </div>
 
-      <h2>🚌 버스 상태</h2>
-      <div className="players-list">
-        {([BusType.PLUS, BusType.MINUS] as const).map((busType) => {
-          const bus = game.buses[busType];
-          return (
-            <div className="score-item" key={busType} style={{ gap: 8 }}>
-              <div
-                className={`bus-marker-${busType}`}
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  boxShadow: `var(--shadow-glow-${busType.toLowerCase()})`,
-                }}
-              />
-              <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                  {busType} 버스
+      {showBusStatus && (
+        <>
+          <h2>🚌 버스 상태</h2>
+          <div className="players-list">
+            {([BusType.PLUS, BusType.MINUS] as const).map((busType) => {
+              const bus = game.buses[busType];
+              return (
+                <div className="score-item" key={busType} style={{ gap: 8 }}>
+                  <div
+                    className={`bus-marker-${busType}`}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      boxShadow: `var(--shadow-glow-${busType.toLowerCase()})`,
+                    }}
+                  />
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
+                      {busType} 버스
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--text-secondary)",
+                        marginTop: 2,
+                      }}
+                    >
+                      ({bus.pos.x}, {bus.pos.y}) · {FACING_LABELS[bus.facing]} 방향 · 벽 {bus.walls.length}
+                    </div>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "var(--text-secondary)",
-                    marginTop: 2,
-                  }}
-                >
-                  ({bus.pos.x}, {bus.pos.y}) · {FACING_LABELS[bus.facing]} 방향 · 벽 {bus.walls.length}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

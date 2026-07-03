@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   adminAddParticipant,
-  adminNext,
   adminRemoveParticipant,
-  adminRevealTurn,
   adminSetParticipantColour,
   adminStartGame,
   adminStartTurn,
@@ -23,9 +21,7 @@ export async function POST(
         | "remove_player"
         | "set_player_colour"
         | "start_game"
-        | "start"
-        | "reveal"
-        | "next";
+        | "start";
       name?: string;
       playerId?: string;
       colour?: Colour;
@@ -45,10 +41,6 @@ export async function POST(
       adminStartGame(roomCode);
     } else if (action === "start") {
       adminStartTurn(roomCode);
-    } else if (action === "reveal") {
-      adminRevealTurn(roomCode);
-    } else if (action === "next") {
-      adminNext(roomCode);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

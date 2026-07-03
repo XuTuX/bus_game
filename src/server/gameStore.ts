@@ -3,16 +3,18 @@ import {
   COLOURS,
   MAX_PLAYERS,
   MAX_PLAYERS_PER_COLOUR,
+  BusType,
   type GameState,
   type TurnAction,
   type StepResult,
-  type BusType,
   type Card,
   type MoveTurnAction,
-  type TileTurnAction,
+  type SwapTileTurnAction,
+  type PlaceObstacleTurnAction,
   createGame,
   nextPlayer,
-  runTurn,
+  runMovePhase,
+  runActionPhase,
   endOfRound,
   nextRound,
   isGameOver,
@@ -40,7 +42,7 @@ export interface LogEntry {
   turn: number;
 }
 
-export type RoomStatus = "LOBBY" | "WAITING" | "CHOOSING" | "SUBMITTED" | "REVEALED" | "GAME_OVER";
+export type RoomStatus = "LOBBY" | "WAITING" | "CHOOSING" | "ACTION_PHASE" | "GAME_OVER";
 
 export interface RoomState {
   game: GameState;
@@ -49,18 +51,16 @@ export interface RoomState {
   status: RoomStatus;
   logIdCounter: number;
   playerIdCounter: number;
-  
-  // Pending actions waiting to be revealed by admin
-  pendingSubmit?: {
-    playerId: string;
-    actions: TurnAction[];
-  };
 }
 
 const rooms = new Map<string, RoomState>();
 
 export function hasRoom(roomCode: string): boolean {
   return rooms.has(roomCode);
+}
+
+export function getRoom(roomCode: string): RoomState | undefined {
+  return rooms.get(roomCode);
 }
 
 export function getOrCreateRoom(roomCode: string): RoomState {
@@ -147,12 +147,12 @@ export function adminSetParticipantColour(
   participant.colour = colour;
 }
 
-// 1. Player submits actions and immediately reveals the result.
+// Player submits moves or action depending on status.
 export function submitTurn(roomCode: string, playerId: string, actions: TurnAction[]) {
   const room = getOrCreateRoom(roomCode);
   
-  if (room.status !== "CHOOSING") {
-    throw new Error("Currently not in choosing phase.");
+  if (room.status !== "CHOOSING" && room.status !== "ACTION_PHASE") {
+    throw new Error("Currently not in a turn submission phase.");
   }
 
   const player = nextPlayer(room.game);
@@ -160,12 +160,101 @@ export function submitTurn(roomCode: string, playerId: string, actions: TurnActi
     throw new Error(`It is not ${playerId}'s turn.`);
   }
 
-  applyTurn(room, actions);
-  room.pendingSubmit = undefined;
-  room.status = isGameOver(room.game) ? "GAME_OVER" : "CHOOSING";
+  if (room.status === "CHOOSING") {
+    // 1. Movement Phase
+    const clone = deepClone(room.game);
+    const originalHand = [...player.hand];
+    const results = runMovePhase(player, actions as MoveTurnAction[], clone);
+    
+    // Log the moves
+    const actionDetails: LogEntry["actions"] = [];
+    let handCopy = [...originalHand];
+    (actions as MoveTurnAction[]).forEach((move, i) => {
+      const result = results[i];
+      const label = actionLabel(move, handCopy);
+      handCopy.splice(move.cardIndex, 1);
+      actionDetails.push({
+        actionLabel: label,
+        bus: move.bus,
+        applied: result.applied,
+        reason: result.reason,
+        scoreGained: result.scoreGained ?? 0,
+      });
+    });
+
+    if (actionDetails.length === 0) {
+      actionDetails.push({
+        actionLabel: "이동 패스",
+        bus: BusType.PLUS,
+        applied: true,
+        scoreGained: 0,
+      });
+    }
+
+    const entry: LogEntry = {
+      id: ++room.logIdCounter,
+      playerId: player.name ?? player.id,
+      team: player.team,
+      actions: actionDetails,
+      round: room.game.roundIndex + 1,
+      turn: room.game.turnIndex + 1,
+    };
+    room.logs.unshift(entry);
+    room.game = clone;
+    room.status = "ACTION_PHASE";
+  } else if (room.status === "ACTION_PHASE") {
+    // 2. Action Phase
+    const clone = deepClone(room.game);
+    const action = actions[0] as SwapTileTurnAction | PlaceObstacleTurnAction | undefined;
+    const result = runActionPhase(player, action || null, clone);
+    
+    // Log the action
+    const actionDetails: LogEntry["actions"] = [];
+    if (action) {
+      actionDetails.push({
+        actionLabel: action.type === "SWAP_TILE" ? "타일 교체" : "장애물 설치",
+        bus: action.bus,
+        applied: result.applied,
+        reason: result.reason,
+        scoreGained: 0,
+      });
+    } else {
+      actionDetails.push({
+        actionLabel: "행동 패스",
+        bus: BusType.PLUS,
+        applied: true,
+        scoreGained: 0,
+      });
+    }
+
+    const entry: LogEntry = {
+      id: ++room.logIdCounter,
+      playerId: player.name ?? player.id,
+      team: player.team,
+      actions: actionDetails,
+      round: room.game.roundIndex + 1,
+      turn: room.game.turnIndex + 1,
+    };
+    room.logs.unshift(entry);
+
+    if (endOfRound(clone)) {
+      nextRound(clone);
+    }
+
+    room.game = clone;
+
+    // Transition status
+    if (isGameOver(room.game)) {
+      room.status = "GAME_OVER";
+    } else if (endOfRound(room.game)) {
+      room.status = "WAITING";
+    } else {
+      room.status = "CHOOSING";
+    }
+  }
 }
 
-// 1.5. Admin starts game (Moves to WAITING)
+// Admin starts game (LOBBY → WAITING)
 export function adminStartGame(roomCode: string) {
   const room = getOrCreateRoom(roomCode);
   if (room.status !== "LOBBY") {
@@ -190,10 +279,10 @@ export function adminStartGame(roomCode: string) {
   room.status = "WAITING";
 }
 
-// 2. Admin starts turn (Moves to CHOOSING)
+// Admin starts turn (WAITING → CHOOSING)
 export function adminStartTurn(roomCode: string) {
   const room = getOrCreateRoom(roomCode);
-  if (room.status !== "WAITING" && room.status !== "REVEALED") {
+  if (room.status !== "WAITING") {
     throw new Error("Cannot start turn from current status.");
   }
   if (isGameOver(room.game)) {
@@ -203,88 +292,27 @@ export function adminStartTurn(roomCode: string) {
   room.status = "CHOOSING";
 }
 
-// 3. Admin reveals results (Moves to REVEALED)
-export function adminRevealTurn(roomCode: string) {
-  const room = getOrCreateRoom(roomCode);
-  if (room.status !== "SUBMITTED" || !room.pendingSubmit) {
-    throw new Error("No pending submission to reveal.");
-  }
-
-  applyTurn(room, room.pendingSubmit.actions);
-  room.pendingSubmit = undefined;
-  room.status = isGameOver(room.game) ? "GAME_OVER" : "REVEALED";
-}
-
-function applyTurn(room: RoomState, actions: TurnAction[]): void {
-  const clone = deepClone(room.game);
-  const player = nextPlayer(clone);
-
-  const originalHand = [...player.hand];
-  const actionDetails: LogEntry["actions"] = [];
-
-  const results: StepResult[] = runTurn(player, actions, clone);
-  
-  let handCopy = [...originalHand];
-  actions.forEach((action, i) => {
-    const result = results[i];
-    const label = actionLabel(action, handCopy);
-    if (!isTileAction(action)) {
-      handCopy.splice(action.cardIndex, 1);
-    }
-    actionDetails.push({
-      actionLabel: label,
-      bus: action.bus,
-      applied: result.applied,
-      reason: result.reason,
-      scoreGained: result.scoreGained ?? 0,
-    });
-  });
-
-  if (endOfRound(clone)) {
-    nextRound(clone);
-  }
-
-  const entry: LogEntry = {
-    id: ++room.logIdCounter,
-    playerId: player.name ?? player.id,
-    team: player.team,
-    actions: actionDetails,
-    round: room.game.roundIndex + 1,
-    turn: room.game.turnIndex + 1,
-  };
-
-  room.logs.unshift(entry);
-  room.game = clone;
-}
-
-function isTileAction(action: TurnAction): action is TileTurnAction {
-  return action.type === "BUFF_TILE" || action.type === "SWAP_TILE";
+function isTileAction(action: TurnAction): boolean {
+  return action.type === "SWAP_TILE" || action.type === "PLACE_OBSTACLE";
 }
 
 function actionLabel(action: TurnAction, currentHand: Card[]): string {
-  if (isTileAction(action)) {
-    return action.type === "BUFF_TILE" ? "버프" : "교체";
+  if (action.type === "SWAP_TILE") {
+    return "타일 교체";
+  }
+  if (action.type === "PLACE_OBSTACLE") {
+    return "장애물 설치";
   }
 
   const card = currentHand[(action as MoveTurnAction).cardIndex];
   return card ? cardLabel(card) : "이동";
 }
 
-// 4. Admin moves to next turn/round (Moves to WAITING)
-export function adminNext(roomCode: string) {
-  const room = getOrCreateRoom(roomCode);
-  if (room.status !== "REVEALED") {
-    throw new Error("Can only go next after revealing.");
-  }
-  if (isGameOver(room.game)) {
-    room.status = "GAME_OVER";
-  } else {
-    room.status = "WAITING";
-  }
-}
-
 export function getPublicState(roomCode: string) {
-  const room = getOrCreateRoom(roomCode);
+  const room = getRoom(roomCode);
+  if (!room) {
+    return null;
+  }
   
   const safeGame = deepClone(room.game);
   safeGame.players.forEach(p => {
@@ -301,7 +329,10 @@ export function getPublicState(roomCode: string) {
 }
 
 export function getPrivateState(roomCode: string, playerId: string) {
-  const room = getOrCreateRoom(roomCode);
+  const room = getRoom(roomCode);
+  if (!room) {
+    return null;
+  }
   
   const player = room.game.players.find(p => p.id === playerId);
   const participant = room.participants.find(p => p.id === playerId);
@@ -310,7 +341,7 @@ export function getPrivateState(roomCode: string, playerId: string) {
   
   return {
     hand: player?.hand || [],
-    isMyTurn: isActive && room.status === "CHOOSING",
+    isMyTurn: isActive && (room.status === "CHOOSING" || room.status === "ACTION_PHASE"),
     status: room.status,
     team: player?.team ?? participant?.colour,
     playerName: player?.name ?? participant?.name ?? player?.id,

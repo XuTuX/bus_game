@@ -35,6 +35,7 @@ export interface Wall {
   from: Coord;
   to: Coord;
   bus: BusType;
+  isObstacle?: boolean;
 }
 
 export interface Region {
@@ -69,7 +70,7 @@ export interface GameState {
   teamScores: Record<Colour, number>;
 }
 
-export type TurnActionKind = "MOVE" | "BUFF_TILE" | "SWAP_TILE";
+export type TurnActionKind = "MOVE" | "SWAP_TILE" | "PLACE_OBSTACLE";
 
 export interface MoveTurnAction {
   type?: "MOVE";
@@ -77,12 +78,19 @@ export interface MoveTurnAction {
   cardIndex: number;
 }
 
-export interface TileTurnAction {
-  type: "BUFF_TILE" | "SWAP_TILE";
+export interface SwapTileTurnAction {
+  type: "SWAP_TILE";
   bus: BusType;
+  target: Coord;
 }
 
-export type TurnAction = MoveTurnAction | TileTurnAction;
+export interface PlaceObstacleTurnAction {
+  type: "PLACE_OBSTACLE";
+  bus: BusType;
+  target: Coord;
+}
+
+export type TurnAction = MoveTurnAction | SwapTileTurnAction | PlaceObstacleTurnAction;
 
 export interface StepResult {
   applied: boolean;
@@ -169,22 +177,30 @@ export function step(
   }
 
   const distance = straightDistance(card.kind);
-  const path = move(bus.pos, bus.facing, distance);
-  if (!legalMovePath(path, board.length)) {
-    return { applied: false, reason: "off-board", regions: [], path };
-  }
-
-  const segments = pathToWallSegments(bus.pos, path);
+  const path: Coord[] = [];
+  let current = { ...bus.pos };
   const existing = [...bus.walls, ...otherWalls];
-  if (segments.some((segment) => wallConflicts(segment, existing))) {
-    return { applied: false, reason: "wall-conflict", regions: [], path };
+
+  for (let i = 0; i < distance; i++) {
+    const next = stepCoord(current, bus.facing);
+
+    // 1. Check off-board
+    if (next.x < 0 || next.x >= board.length || next.y < 0 || next.y >= board.length) {
+      break; // Stop before leaving the board
+    }
+
+    // 2. Check wall/obstacle conflict
+    const segment = wallBetweenTiles(current, next);
+    if (wallConflicts(segment, existing)) {
+      break; // Stop before hitting the wall
+    }
+
+    // 3. Move is valid, apply it
+    path.push(next);
+    current = next;
   }
 
-  for (const segment of segments) {
-    bus.walls.push({ ...segment, bus: busType });
-  }
-  bus.pos = { ...path[path.length - 1] };
-
+  bus.pos = current;
   return { applied: true, regions: [], path };
 }
 
@@ -294,7 +310,7 @@ export function dealHand(rng: Rng = Math.random): Card[] {
   return shuffle(cards, rng);
 }
 
-export function runTurn(player: Player, actions: TurnAction[], game: GameState): StepResult[] {
+export function runMovePhase(player: Player, actions: MoveTurnAction[], game: GameState): StepResult[] {
   if (isGameOver(game)) {
     throw new Error("Game is already over");
   }
@@ -302,17 +318,22 @@ export function runTurn(player: Player, actions: TurnAction[], game: GameState):
   if (active.id !== player.id) {
     throw new Error(`It is ${active.id}'s turn, not ${player.id}'s`);
   }
-  validateTurnActions(active.hand, actions);
 
-  const results: StepResult[] = [];
-  if (actions.length === 1 && isTileAction(actions[0])) {
-    results.push(runTileAction(active, actions[0], game));
-    game.turnIndex = (game.turnIndex + 1) % game.players.length;
-    return results;
+  // Validate moves
+  if (actions.length > 3) {
+    throw new Error("A turn may play at most 3 cards");
+  }
+  let remaining = player.hand.length;
+  for (const action of actions) {
+    if (action.cardIndex < 0 || action.cardIndex >= remaining) {
+      throw new Error(`Invalid card index ${action.cardIndex}`);
+    }
+    remaining -= 1;
   }
 
-  for (const action of actions as MoveTurnAction[]) {
-    const [card] = active.hand.splice(action.cardIndex, 1);
+  const results: StepResult[] = [];
+  for (const action of actions) {
+    const [card] = player.hand.splice(action.cardIndex, 1);
     const bus = game.buses[action.bus];
     const otherWalls = Object.entries(game.buses)
       .filter(([type]) => type !== action.bus)
@@ -320,60 +341,67 @@ export function runTurn(player: Player, actions: TurnAction[], game: GameState):
     const result = step(bus, card, game.board, action.bus, otherWalls);
     if (result.applied && result.path) {
       result.scoreGained = scorePathTiles(result.path, action.bus, game);
+      const newRegions = floodFillRegions(bus, game.board, action.bus);
+      for (const region of newRegions) {
+        scoreRegion(region, game);
+      }
+      result.regions = newRegions;
     }
     results.push(result);
   }
-
-  game.turnIndex = (game.turnIndex + 1) % game.players.length;
   return results;
 }
 
-function validateTurnActions(hand: Card[], actions: TurnAction[]): void {
-  if (actions.length === 0) {
-    return;
+export function runActionPhase(
+  player: Player,
+  action: SwapTileTurnAction | PlaceObstacleTurnAction | null,
+  game: GameState
+): StepResult {
+  if (isGameOver(game)) {
+    throw new Error("Game is already over");
   }
-  const hasTileAction = actions.some(isTileAction);
-  if (hasTileAction) {
-    if (actions.length !== 1 || !isTileAction(actions[0])) {
-      throw new Error("A tile action must be played alone");
+  const active = nextPlayer(game);
+  if (active.id !== player.id) {
+    throw new Error(`It is ${active.id}'s turn, not ${player.id}'s`);
+  }
+
+  let result: StepResult = { applied: true, regions: [] };
+
+  if (action) {
+    const bus = game.buses[action.bus];
+    const busPos = bus.pos;
+    const dx = Math.abs(action.target.x - busPos.x);
+    const dy = Math.abs(action.target.y - busPos.y);
+    if (dx > 1 || dy > 1) {
+      result = { applied: false, reason: "target-out-of-range", regions: [] };
+    } else {
+      const targetTile = game.board[action.target.y]?.[action.target.x];
+      const busTile = game.board[busPos.y]?.[busPos.x];
+
+      if (!targetTile || !busTile) {
+        result = { applied: false, reason: "invalid-target", regions: [] };
+      } else if (action.type === "SWAP_TILE") {
+        // Swap the colours of the bus's tile and the target tile
+        const temp = busTile.colour;
+        busTile.colour = targetTile.colour;
+        targetTile.colour = temp;
+        result = { applied: true, regions: [] };
+      } else if (action.type === "PLACE_OBSTACLE") {
+        // Place obstacle (wall segment) on the border between the bus and the target tile
+        const segment = wallBetweenTiles(busPos, action.target);
+        bus.walls.push({
+          from: segment.from,
+          to: segment.to,
+          bus: action.bus,
+          isObstacle: true,
+        });
+        result = { applied: true, regions: [] };
+      }
     }
-    return;
-  }
-  if (actions.length > 3) {
-    throw new Error("A turn may play at most 3 cards");
   }
 
-  let remaining = hand.length;
-  for (const action of actions as MoveTurnAction[]) {
-    if (action.cardIndex < 0 || action.cardIndex >= remaining) {
-      throw new Error(`Invalid card index ${action.cardIndex}`);
-    }
-    remaining -= 1;
-  }
-}
-
-function isTileAction(action: TurnAction): action is TileTurnAction {
-  return action.type === "BUFF_TILE" || action.type === "SWAP_TILE";
-}
-
-function runTileAction(player: Player, action: TileTurnAction, game: GameState): StepResult {
-  const bus = game.buses[action.bus];
-  const tile = game.board[bus.pos.y]?.[bus.pos.x];
-  if (!tile) {
-    return { applied: false, reason: "invalid-tile", regions: [] };
-  }
-
-  if (action.type === "BUFF_TILE") {
-    if (tile.colour !== player.team) {
-      return { applied: false, reason: "not-your-tile", regions: [] };
-    }
-    tile.scoreBonus = (tile.scoreBonus ?? 0) + 1;
-    return { applied: true, regions: [] };
-  }
-
-  tile.colour = player.team;
-  tile.scoreBonus = 0;
-  return { applied: true, regions: [] };
+  game.turnIndex = (game.turnIndex + 1) % game.players.length;
+  return result;
 }
 
 function scorePathTiles(path: Coord[], bus: BusType, game: GameState): number {
@@ -508,7 +536,7 @@ function createDefaultPlayers(rng: Rng): Player[] {
   return players;
 }
 
-function stepCoord(coord: Coord, facing: Facing): Coord {
+export function stepCoord(coord: Coord, facing: Facing): Coord {
   switch (facing) {
     case Facing.N:
       return { x: coord.x, y: coord.y - 1 };
@@ -538,7 +566,7 @@ function pathToWallSegments(start: Coord, path: Coord[]): Omit<Wall, "bus">[] {
   return segments;
 }
 
-function wallBetweenTiles(fromTile: Coord, toTile: Coord): Omit<Wall, "bus"> {
+export function wallBetweenTiles(fromTile: Coord, toTile: Coord): Omit<Wall, "bus"> {
   if (toTile.x === fromTile.x + 1) {
     return { from: { x: toTile.x, y: toTile.y }, to: { x: toTile.x, y: toTile.y + 1 } };
   }
@@ -554,7 +582,7 @@ function wallBetweenTiles(fromTile: Coord, toTile: Coord): Omit<Wall, "bus"> {
   throw new Error("Wall can only be created between adjacent tiles");
 }
 
-function wallConflicts(candidate: Omit<Wall, "bus">, existing: Wall[]): boolean {
+export function wallConflicts(candidate: Omit<Wall, "bus">, existing: Wall[]): boolean {
   const candidateWall = { ...candidate, bus: BusType.PLUS };
   return existing.some(
     (wall) => wallKey(wall) === wallKey(candidateWall) || segmentsCrossInside(wall, candidateWall)

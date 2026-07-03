@@ -7,18 +7,17 @@ const FACING_ROTATION: Record<string, number> = {
   W: 180,
 };
 
-export default function Board({ game }: { game: GameState }) {
+export default function Board({
+  game,
+  showFacing = false,
+}: {
+  game: GameState;
+  showFacing?: boolean;
+}) {
   const tileSize = 56;
   const tileGap = 3;
   const svgWidth = BOARD_SIZE * tileSize + (BOARD_SIZE - 1) * tileGap;
   const svgHeight = svgWidth;
-
-  const allWalls: (Wall & { busType: BusType })[] = [];
-  for (const [busType, busState] of Object.entries(game.buses)) {
-    for (const wall of busState.walls) {
-      allWalls.push({ ...wall, busType: busType as BusType });
-    }
-  }
 
   const scoredTiles = new Set<string>();
   for (const busState of Object.values(game.buses)) {
@@ -28,6 +27,13 @@ export default function Board({ game }: { game: GameState }) {
           scoredTiles.add(`${tile.x},${tile.y}`);
         }
       }
+    }
+  }
+
+  const allWalls: (Wall & { busType: BusType })[] = [];
+  for (const [busType, busState] of Object.entries(game.buses)) {
+    for (const wall of busState.walls) {
+      allWalls.push({ ...wall, busType: busType as BusType });
     }
   }
 
@@ -58,10 +64,20 @@ export default function Board({ game }: { game: GameState }) {
       >
         {allWalls.map((wall, i) => {
           const step = tileSize + tileGap;
-          const x1 = wall.from.x * step + tileSize / 2;
-          const y1 = wall.from.y * step + tileSize / 2;
-          const x2 = wall.to.x * step + tileSize / 2;
-          const y2 = wall.to.y * step + tileSize / 2;
+          let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+          const isVertical = wall.from.x === wall.to.x;
+
+          if (isVertical) {
+            x1 = wall.from.x * step - 1.5;
+            x2 = x1;
+            y1 = wall.from.y * step;
+            y2 = wall.to.y * step;
+          } else {
+            y1 = wall.from.y * step - 1.5;
+            y2 = y1;
+            x1 = wall.from.x * step;
+            x2 = wall.to.x * step;
+          }
 
           return (
             <line
@@ -71,7 +87,11 @@ export default function Board({ game }: { game: GameState }) {
               x2={x2}
               y2={y2}
               className={
-                wall.busType === BusType.PLUS ? "wall-plus" : "wall-minus"
+                wall.isObstacle
+                  ? "wall-obstacle"
+                  : wall.busType === BusType.PLUS
+                  ? "wall-plus"
+                  : "wall-minus"
               }
             />
           );
@@ -80,25 +100,29 @@ export default function Board({ game }: { game: GameState }) {
 
       {Object.entries(game.buses).map(([busType, busState]) => {
         const step = tileSize + tileGap;
-        const left = 12 + busState.pos.x * step + tileSize / 2 - 19;
-        const top = 12 + busState.pos.y * step + tileSize / 2 - 13;
+        const width = showFacing ? 38 : 28;
+        const height = showFacing ? 26 : 28;
+        const left = 12 + busState.pos.x * step + tileSize / 2 - width / 2;
+        const top = 12 + busState.pos.y * step + tileSize / 2 - height / 2;
         const offset = busType === BusType.PLUS ? -4 : 4;
         const rotation = FACING_ROTATION[busState.facing] ?? 0;
 
         return (
           <div
             key={busType}
-            className={`bus-marker bus-marker-${busType}`}
+            className={`bus-marker bus-marker-${busType} ${
+              !showFacing ? "bus-marker-round" : ""
+            }`}
             style={{
               left: left + offset,
               top: top + offset,
-              transform: `rotate(${rotation}deg)`,
+              transform: showFacing ? `rotate(${rotation}deg)` : "none",
             }}
           >
             <span className="bus-marker-label">
               {busType === BusType.PLUS ? "+" : "-"}
             </span>
-            <span className="bus-marker-head" />
+            {showFacing && <span className="bus-marker-head" />}
           </div>
         );
       })}

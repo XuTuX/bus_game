@@ -534,9 +534,9 @@ h1, h2, h3, .brand-font {
 
 .admin-main {
   display: grid;
-  grid-template-columns: minmax(320px, 520px) minmax(360px, 1fr);
+  grid-template-columns: minmax(460px, 1fr) minmax(300px, 380px) minmax(300px, 380px);
   gap: 24px;
-  width: min(1180px, calc(100% - 40px));
+  width: min(1400px, calc(100% - 40px));
   margin: 0 auto;
   padding: 32px 0;
 }
@@ -1229,5 +1229,126 @@ h1, h2, h3, .brand-font {
   .compact-btn {
     flex: 1;
     text-align: center;
+  }
+}
+
+/* Round bus marker override */
+.bus-marker-round {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+}
+
+/* Obstacle classes */
+.tile-has-obstacle {
+  background: var(--bg-tertiary) !important;
+  box-shadow: inset 0 0 0 2px var(--border-medium) !important;
+}
+.tile-obstacle {
+  font-size: 1.3rem;
+  z-index: 2;
+  animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Grouped cards component styling */
+.grouped-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.grouped-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.grouped-card-row:hover:not(.disabled) {
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+.grouped-card-row.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.grouped-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.grouped-card-badge {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* 3x3 Grid Action Panel */
+.action-grid-3x3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 200px;
+  margin: 16px auto;
+}
+.action-grid-cell {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.action-grid-cell:hover:not(.disabled) {
+  transform: scale(1.05);
+  border-color: var(--border-medium);
+}
+.action-grid-cell.selected {
+  border-color: #0066cc;
+  box-shadow: 0 0 8px rgba(0, 102, 204, 0.3);
+}
+.action-grid-cell.center-cell {
+  background: rgba(0, 0, 0, 0.05);
+}
+.action-grid-cell.disabled {
+  cursor: not-allowed;
+  border-color: transparent;
+  filter: brightness(0.9);
+}
+.action-phase-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+/* Glowing manual obstacles (between tiles) */
+.wall-obstacle {
+  stroke: #ff7700;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 6 4;
+  animation: obstacle-glow 1.5s infinite alternate;
+}
+
+@keyframes obstacle-glow {
+  from {
+    filter: drop-shadow(0 0 1px rgba(255, 120, 0, 0.6));
+  }
+  to {
+    filter: drop-shadow(0 0 4px rgba(255, 120, 0, 1));
   }
 }

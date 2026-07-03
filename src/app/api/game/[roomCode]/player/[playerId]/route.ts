@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { roomCode, playerId } = await params;
   const state = getPrivateState(roomCode, playerId);
-  if (!state.playerName) {
+  if (!state || !state.playerName) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
   }
   return NextResponse.json(state);

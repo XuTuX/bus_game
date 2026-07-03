@@ -18,9 +18,8 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
 const STATUS_LABELS = {
   LOBBY: "마스터 입력 대기",
   WAITING: "턴 시작 대기",
-  CHOOSING: "딜러룸 입력 중",
-  SUBMITTED: "처리 중",
-  REVEALED: "결과 반영됨",
+  CHOOSING: "이동 카드 선택 중",
+  ACTION_PHASE: "행동 선택 중",
   GAME_OVER: "게임 종료",
 } as const;
 
@@ -117,8 +116,7 @@ export default function PublicBoardPage({
       </main>
 
       <aside className="public-sidebar public-sidebar-right">
-        <ScoreBoard game={game} />
-        <ActionLog logs={logs} />
+        <ScoreBoard game={game} showBusStatus={false} />
       </aside>
     </div>
   );

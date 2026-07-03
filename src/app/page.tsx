@@ -46,7 +46,13 @@ export default function Home() {
             : destination === "dealer"
             ? `/dealer/${code}`
             : `/game/${code}`;
-        router.push(path);
+        
+        if (destination === "master") {
+          router.push(path);
+        } else {
+          window.open(path, "_blank");
+          setLoading(false);
+        }
       } else {
         setError("존재하지 않는 방 코드입니다.");
         setLoading(false);
