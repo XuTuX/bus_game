@@ -6,18 +6,15 @@ import Board from "@/components/Board";
 import ScoreBoard from "@/components/ScoreBoard";
 import {
   BusType,
-  cardLabel,
+  COLOURS,
   type CardKind,
   type Colour,
   type MoveTurnAction,
   type TurnAction,
   rotate,
-  move,
-  legalMovePath,
   wallBetweenTiles,
   stepCoord,
   wallConflicts,
-  Facing,
   type GameState,
 } from "@/lib/game";
 import { submitAction, usePrivateGame, usePublicGame } from "@/lib/useGameState";
@@ -75,9 +72,30 @@ function getMovesWithIndices(
   return actions;
 }
 
-export default function DealerRoom({ roomCode, playerId }: { roomCode: string; playerId?: string }) {
+export default function DealerRoom({
+  roomCode,
+  playerId,
+  roomBus,
+}: {
+  roomCode: string;
+  playerId?: string;
+  roomBus?: BusType;
+}) {
   const publicState = usePublicGame(roomCode);
-  const resolvedPlayerId = playerId || "";
+  const initialGame = publicState?.game as GameState | undefined;
+
+  let resolvedPlayerId = playerId || "";
+
+  if (roomBus && initialGame && publicState?.status !== "LOBBY") {
+    const currentTeam = COLOURS[initialGame.turnIndex];
+    const teamPlayers = initialGame.players.filter((p) => p.team === currentTeam);
+    const plusPlayer = teamPlayers[0];
+    const minusPlayer = teamPlayers[1] || teamPlayers[0];
+
+    resolvedPlayerId =
+      roomBus === BusType.PLUS ? plusPlayer?.id || "" : minusPlayer?.id || "";
+  }
+
   const privateState = usePrivateGame(roomCode, resolvedPlayerId);
   
   // Simulated state for step-by-step client-side movement animation
@@ -101,10 +119,19 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
   const isMinusSubmitted = publicState?.pendingMoves?.MINUS ?? false;
   const isPlusActionSubmitted = publicState?.pendingActions?.PLUS ?? false;
   const isMinusActionSubmitted = publicState?.pendingActions?.MINUS ?? false;
+  const selectedBus = roomBus ?? chosenBus;
+  const isSelectedBusController =
+    selectedBus === BusType.PLUS ? isPlusController : isMinusController;
+  const isSelectedMoveSubmitted =
+    selectedBus === BusType.PLUS ? isPlusSubmitted : isMinusSubmitted;
+  const isSelectedActionSubmitted =
+    selectedBus === BusType.PLUS ? isPlusActionSubmitted : isMinusActionSubmitted;
 
   // Auto-lock chosenBus based on role authority
   useEffect(() => {
-    if (isPlusController && !isMinusController) {
+    if (roomBus) {
+      setChosenBus(roomBus);
+    } else if (isPlusController && !isMinusController) {
       setChosenBus(BusType.PLUS);
     } else if (isMinusController && !isPlusController) {
       setChosenBus(BusType.MINUS);
@@ -118,6 +145,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
       }
     }
   }, [
+    roomBus,
     isPlusController,
     isMinusController,
     isPlusSubmitted,
@@ -135,7 +163,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
     setAnimatedGame(null);
   }, [resolvedPlayerId, publicState?.status]);
 
-  if (!publicState) {
+  if (!publicState || !publicState.game) {
     return (
       <div className="dealer-layout">
         <div className="dealer-main" style={{ justifyContent: "center" }}>
@@ -145,30 +173,39 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
     );
   }
 
-  const { game, status } = publicState;
+  const game = publicState.game as GameState;
+  const { status } = publicState;
   const activePlayer = game.players.find((player) => player.id === resolvedPlayerId);
   const hand = privateState?.hand ?? [];
-  const team = privateState?.team ?? activePlayer?.team;
+  const activeTeam = privateState?.team ?? activePlayer?.team;
   const playerName = privateState?.playerName ?? activePlayer?.name ?? resolvedPlayerId;
-  const teamCssName = (team ?? "Blue").toLowerCase();
+  const teamCssName = (activeTeam ?? "Blue").toLowerCase();
 
   // Check if I have already submitted my moves/action for this turn
-  const hasISubmittedMoves =
-    ((isPlusController && isPlusSubmitted) || !isPlusController) &&
-    ((isMinusController && isMinusSubmitted) || !isMinusController) &&
-    (isPlusController || isMinusController);
+  const hasISubmittedMoves = roomBus
+    ? isSelectedBusController && isSelectedMoveSubmitted
+    : ((isPlusController && isPlusSubmitted) || !isPlusController) &&
+      ((isMinusController && isMinusSubmitted) || !isMinusController) &&
+      (isPlusController || isMinusController);
 
-  const hasISubmittedAction =
-    ((isPlusController && isPlusActionSubmitted) || !isPlusController) &&
-    ((isMinusController && isMinusActionSubmitted) || !isMinusController) &&
-    (isPlusController || isMinusController);
+  const hasISubmittedAction = roomBus
+    ? isSelectedBusController && isSelectedActionSubmitted
+    : ((isPlusController && isPlusActionSubmitted) || !isPlusController) &&
+      ((isMinusController && isMinusActionSubmitted) || !isMinusController) &&
+      (isPlusController || isMinusController);
 
-  const canAct = privateState?.isMyTurn && (status === "CHOOSING" || status === "ACTION_PHASE");
+  const canAct =
+    privateState?.isMyTurn &&
+    isSelectedBusController &&
+    ((status === "CHOOSING" && !isSelectedMoveSubmitted) ||
+      (status === "ACTION_PHASE" && !isSelectedActionSubmitted));
   const plusBusDisabled =
+    !!roomBus ||
     submitting ||
     (isMinusController && !isPlusController) ||
     (isPlusController && isMinusController && isPlusSubmitted);
   const minusBusDisabled =
+    !!roomBus ||
     submitting ||
     (isPlusController && !isMinusController) ||
     (isPlusController && isMinusController && (!isPlusSubmitted || isMinusSubmitted));
@@ -187,12 +224,15 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
   };
 
   const activeBusType =
-    status === "ACTION_PHASE" && isPlusController && !isMinusController
+    roomBus ??
+    (status === "ACTION_PHASE" && isPlusController && !isMinusController
       ? BusType.PLUS
       : status === "ACTION_PHASE" && isMinusController && !isPlusController
         ? BusType.MINUS
-        : chosenBus;
+        : chosenBus);
   const activeBusPos = game.buses[activeBusType].pos;
+  const roomBusLabel = selectedBus === BusType.PLUS ? "PLUS" : "MINUS";
+  const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
   // Generate 3x3 cells centered at the active bus position
   const gridCells = [];
@@ -210,7 +250,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
 
   // Handle Movement submission (transitions status to ACTION_PHASE)
   const handleMoveSubmit = async () => {
-    if (!resolvedPlayerId || status !== "CHOOSING") return;
+    if (!resolvedPlayerId || status !== "CHOOSING" || !canAct) return;
     setSubmitting(true);
     setErrorMsg("");
 
@@ -223,9 +263,9 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
 
       for (let i = 0; i < selectedMoves.length; i++) {
         const kind = selectedMoves[i];
-        const bus = animClone.buses[chosenBus];
+        const bus = animClone.buses[activeBusType];
         const otherWalls = Object.entries(animClone.buses)
-          .filter(([type]) => type !== chosenBus)
+          .filter(([type]) => type !== activeBusType)
           .flatMap(([, state]: any) => state.walls);
 
         if (kind === "LEFT" || kind === "RIGHT") {
@@ -256,9 +296,9 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
       }
 
       // 2. Submit the actual moves to the server
-      const selectedWithBuses = selectedMoves.map((kind) => ({ kind, bus: chosenBus }));
+      const selectedWithBuses = selectedMoves.map((kind) => ({ kind, bus: activeBusType }));
       const moveActions = getMovesWithIndices(hand, selectedWithBuses);
-      await submitAction(roomCode, resolvedPlayerId, moveActions, chosenBus);
+      await submitAction(roomCode, resolvedPlayerId, moveActions, activeBusType);
       setSelectedMoves([]);
     } catch (e: any) {
       setErrorMsg(e.message || "이동 제출에 실패했습니다.");
@@ -270,7 +310,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
 
   // Handle Action submission (transitions turn to next player)
   const handleActionSubmit = async () => {
-    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !selectedActionType || !actionTarget) return;
+    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !selectedActionType || !actionTarget || !canAct) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -291,7 +331,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
 
   // Handle Skipping Action
   const handleActionPass = async () => {
-    if (!resolvedPlayerId || status !== "ACTION_PHASE") return;
+    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !canAct) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -306,11 +346,11 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
   };
 
   const handlePass = async () => {
-    if (!resolvedPlayerId || status !== "CHOOSING") return;
+    if (!resolvedPlayerId || status !== "CHOOSING" || !canAct) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
-      await submitAction(roomCode, resolvedPlayerId, [], chosenBus);
+      await submitAction(roomCode, resolvedPlayerId, [], activeBusType);
       setSelectedMoves([]);
     } catch (e: any) {
       setErrorMsg(e.message || "이동 패스에 실패했습니다.");
@@ -321,6 +361,7 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
 
   // Role subtitle text
   const getRoleSubtitle = () => {
+    if (roomBus) return `(${roomBusLabel} 버스 전용 방)`;
     if (isPlusController && isMinusController) return "(PLUS & MINUS 버스 제어)";
     if (isPlusController) return "(PLUS 버스 제어)";
     if (isMinusController) return "(MINUS 버스 제어)";
@@ -331,9 +372,9 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
     <div className="dealer-layout standalone-dealer-layout">
       <header className="header">
         <div>
-          <h1 className="brand-font">딜러룸</h1>
+          <h1 className="brand-font">{roomTitle}</h1>
           <p className="header-subtitle">
-            방 코드 <strong>{roomCode}</strong> · {STATUS_TEXT[status] || STATUS_TEXT.CHOOSING}
+            <strong>{roomTitle}</strong> · 방 코드 <strong>{roomCode}</strong> · {STATUS_TEXT[status] || STATUS_TEXT.CHOOSING}
           </p>
         </div>
         <Link href={`/game/${roomCode}`} className="btn btn-ghost" target="_blank" rel="noopener noreferrer">
@@ -366,10 +407,10 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
               <div style={{ fontSize: "0.85rem", fontWeight: "bold", color: "var(--text-secondary)", marginTop: 4 }}>
                 {getRoleSubtitle()}
               </div>
-              {team && (
+              {activeTeam && (
                 <div className="team-pill" style={{ marginTop: 8 }}>
-                  <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
-                  <span className="brand-font">{team}</span>
+                  <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[activeTeam] }} />
+                  <span className="brand-font">{activeTeam}</span>
                 </div>
               )}
             </div>
@@ -409,43 +450,57 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
                 {status === "CHOOSING" ? (
                   <>
                     <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
-                      <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 1: 이동 수단 및 버스 지정</h3>
+                      <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 1: 이동 카드 선택</h3>
                     </div>
 
-                    {/* 1. Bus Selection (Disabled if locked to PLUS or MINUS role) */}
-                    <div style={{ marginBottom: 20 }}>
-                      <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: 8, color: "var(--text-secondary)" }}>
-                        움직일 버스 선택
-                      </label>
-                      <div className="tile-action-options">
-                        <button
-                          type="button"
-                          className={`tile-action-btn ${chosenBus === BusType.PLUS ? "tile-action-btn-active" : ""}`}
+                    {roomBus ? (
+                      <div className="tile-action-options" style={{ marginBottom: 20 }}>
+                        <div
+                          className="tile-action-btn tile-action-btn-active"
                           style={{
-                            background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                            borderColor: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                            color: chosenBus === BusType.PLUS ? "white" : undefined,
+                            background: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
+                            borderColor: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
+                            color: "white",
                           }}
-                          onClick={() => setChosenBus(BusType.PLUS)}
-                          disabled={plusBusDisabled}
                         >
-                          ＋ PLUS 버스
-                        </button>
-                        <button
-                          type="button"
-                          className={`tile-action-btn ${chosenBus === BusType.MINUS ? "tile-action-btn-active" : ""}`}
-                          style={{
-                            background: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                            borderColor: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                            color: chosenBus === BusType.MINUS ? "white" : undefined,
-                          }}
-                          onClick={() => setChosenBus(BusType.MINUS)}
-                          disabled={minusBusDisabled}
-                        >
-                          ー MINUS 버스
-                        </button>
+                          {activeBusType === BusType.PLUS ? "＋ PLUS 버스 전용" : "ー MINUS 버스 전용"}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div style={{ marginBottom: 20 }}>
+                        <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: 8, color: "var(--text-secondary)" }}>
+                          움직일 버스 선택
+                        </label>
+                        <div className="tile-action-options">
+                          <button
+                            type="button"
+                            className={`tile-action-btn ${chosenBus === BusType.PLUS ? "tile-action-btn-active" : ""}`}
+                            style={{
+                              background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
+                              borderColor: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
+                              color: chosenBus === BusType.PLUS ? "white" : undefined,
+                            }}
+                            onClick={() => setChosenBus(BusType.PLUS)}
+                            disabled={plusBusDisabled}
+                          >
+                            ＋ PLUS 버스
+                          </button>
+                          <button
+                            type="button"
+                            className={`tile-action-btn ${chosenBus === BusType.MINUS ? "tile-action-btn-active" : ""}`}
+                            style={{
+                              background: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
+                              borderColor: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
+                              color: chosenBus === BusType.MINUS ? "white" : undefined,
+                            }}
+                            onClick={() => setChosenBus(BusType.MINUS)}
+                            disabled={minusBusDisabled}
+                          >
+                            ー MINUS 버스
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* 2. Move Category Tab */}
                     <div className="action-mode-tabs" style={{ marginBottom: 20 }}>
@@ -526,8 +581,8 @@ export default function DealerRoom({ roomCode, playerId }: { roomCode: string; p
                             key={i}
                             className="selected-chip"
                             style={{
-                              background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
-                              boxShadow: chosenBus === BusType.PLUS ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
+                              background: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
+                              boxShadow: activeBusType === BusType.PLUS ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
                             }}
                           >
                             <span>
