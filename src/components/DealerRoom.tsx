@@ -75,10 +75,10 @@ function getMovesWithIndices(
   return actions;
 }
 
-export default function DealerRoom({ roomCode }: { roomCode: string }) {
+export default function DealerRoom({ roomCode, playerId }: { roomCode: string; playerId?: string }) {
   const publicState = usePublicGame(roomCode);
-  const activePlayerId = publicState?.activePlayerId ?? "";
-  const privateState = usePrivateGame(roomCode, activePlayerId);
+  const resolvedPlayerId = playerId || "";
+  const privateState = usePrivateGame(roomCode, resolvedPlayerId);
   
   // Simulated state for step-by-step client-side movement animation
   const [animatedGame, setAnimatedGame] = useState<GameState | null>(null);
@@ -95,13 +95,45 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const isPlusController = privateState?.isPlusController ?? false;
+  const isMinusController = privateState?.isMinusController ?? false;
+  const isPlusSubmitted = publicState?.pendingMoves?.PLUS ?? false;
+  const isMinusSubmitted = publicState?.pendingMoves?.MINUS ?? false;
+  const isPlusActionSubmitted = publicState?.pendingActions?.PLUS ?? false;
+  const isMinusActionSubmitted = publicState?.pendingActions?.MINUS ?? false;
+
+  // Auto-lock chosenBus based on role authority
+  useEffect(() => {
+    if (isPlusController && !isMinusController) {
+      setChosenBus(BusType.PLUS);
+    } else if (isMinusController && !isPlusController) {
+      setChosenBus(BusType.MINUS);
+    } else if (isPlusController && isMinusController) {
+      if (publicState?.status === "CHOOSING") {
+        setChosenBus(isPlusSubmitted && !isMinusSubmitted ? BusType.MINUS : BusType.PLUS);
+      } else if (publicState?.status === "ACTION_PHASE") {
+        setChosenBus(
+          isPlusActionSubmitted && !isMinusActionSubmitted ? BusType.MINUS : BusType.PLUS
+        );
+      }
+    }
+  }, [
+    isPlusController,
+    isMinusController,
+    isPlusSubmitted,
+    isMinusSubmitted,
+    isPlusActionSubmitted,
+    isMinusActionSubmitted,
+    publicState?.status,
+  ]);
+
   useEffect(() => {
     setSelectedMoves([]);
     setSelectedActionType(null);
     setActionTarget(null);
     setErrorMsg("");
     setAnimatedGame(null);
-  }, [activePlayerId, publicState?.status]);
+  }, [resolvedPlayerId, publicState?.status]);
 
   if (!publicState) {
     return (
@@ -113,14 +145,33 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
     );
   }
 
-  const { game, status, logs } = publicState;
-  const activePlayer = game.players.find((player) => player.id === activePlayerId);
+  const { game, status } = publicState;
+  const activePlayer = game.players.find((player) => player.id === resolvedPlayerId);
   const hand = privateState?.hand ?? [];
-  const isMyTurn = Boolean(privateState?.isMyTurn && activePlayerId);
   const team = privateState?.team ?? activePlayer?.team;
-  const playerName = privateState?.playerName ?? activePlayer?.name ?? activePlayer?.id;
-  const canAct = isMyTurn && (status === "CHOOSING" || status === "ACTION_PHASE");
+  const playerName = privateState?.playerName ?? activePlayer?.name ?? resolvedPlayerId;
   const teamCssName = (team ?? "Blue").toLowerCase();
+
+  // Check if I have already submitted my moves/action for this turn
+  const hasISubmittedMoves =
+    ((isPlusController && isPlusSubmitted) || !isPlusController) &&
+    ((isMinusController && isMinusSubmitted) || !isMinusController) &&
+    (isPlusController || isMinusController);
+
+  const hasISubmittedAction =
+    ((isPlusController && isPlusActionSubmitted) || !isPlusController) &&
+    ((isMinusController && isMinusActionSubmitted) || !isMinusController) &&
+    (isPlusController || isMinusController);
+
+  const canAct = privateState?.isMyTurn && (status === "CHOOSING" || status === "ACTION_PHASE");
+  const plusBusDisabled =
+    submitting ||
+    (isMinusController && !isPlusController) ||
+    (isPlusController && isMinusController && isPlusSubmitted);
+  const minusBusDisabled =
+    submitting ||
+    (isPlusController && !isMinusController) ||
+    (isPlusController && isMinusController && (!isPlusSubmitted || isMinusSubmitted));
 
   // Group hand cards and calculate remaining unused counts
   const getCardCount = (kind: CardKind) => {
@@ -135,21 +186,12 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
     setSelectedMoves((prev) => [...prev, kind]);
   };
 
-  // Determine active bus for the action phase from the latest move logs
-  const getActiveBusFromLogs = (): BusType => {
-    const latestLog = logs[0];
-    if (latestLog && (latestLog.playerId === playerName || latestLog.playerId === activePlayerId)) {
-      const moves = latestLog.actions.filter(
-        (a) => a.actionLabel !== "타일 교체" && a.actionLabel !== "장애물 설치"
-      );
-      if (moves.length > 0) {
-        return moves[moves.length - 1].bus;
-      }
-    }
-    return chosenBus; // Fallback to chosenBus
-  };
-
-  const activeBusType = status === "ACTION_PHASE" ? getActiveBusFromLogs() : chosenBus;
+  const activeBusType =
+    status === "ACTION_PHASE" && isPlusController && !isMinusController
+      ? BusType.PLUS
+      : status === "ACTION_PHASE" && isMinusController && !isPlusController
+        ? BusType.MINUS
+        : chosenBus;
   const activeBusPos = game.buses[activeBusType].pos;
 
   // Generate 3x3 cells centered at the active bus position
@@ -168,7 +210,7 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
 
   // Handle Movement submission (transitions status to ACTION_PHASE)
   const handleMoveSubmit = async () => {
-    if (!activePlayerId || status !== "CHOOSING") return;
+    if (!resolvedPlayerId || status !== "CHOOSING") return;
     setSubmitting(true);
     setErrorMsg("");
 
@@ -196,19 +238,16 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
           for (let stepIdx = 0; stepIdx < distance; stepIdx++) {
             const next = stepCoord(bus.pos, bus.facing);
 
-            // Check off-board boundary
             if (next.x < 0 || next.x >= animClone.board.length || next.y < 0 || next.y >= animClone.board.length) {
               break;
             }
 
-            // Check wall/obstacle conflict
             const segment = wallBetweenTiles(bus.pos, next);
             const existing = [...bus.walls, ...otherWalls];
             if (wallConflicts(segment, existing)) {
               break;
             }
 
-            // Step is valid, apply it on the local animation state
             bus.pos = next;
             setAnimatedGame({ ...animClone });
             await delay(600); // 600ms per tile step
@@ -216,10 +255,10 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
         }
       }
 
-      // 2. Submit the actual moves to the server (updated immediately on public board)
+      // 2. Submit the actual moves to the server
       const selectedWithBuses = selectedMoves.map((kind) => ({ kind, bus: chosenBus }));
       const moveActions = getMovesWithIndices(hand, selectedWithBuses);
-      await submitAction(roomCode, activePlayerId, moveActions);
+      await submitAction(roomCode, resolvedPlayerId, moveActions, chosenBus);
       setSelectedMoves([]);
     } catch (e: any) {
       setErrorMsg(e.message || "이동 제출에 실패했습니다.");
@@ -231,7 +270,7 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
 
   // Handle Action submission (transitions turn to next player)
   const handleActionSubmit = async () => {
-    if (!activePlayerId || status !== "ACTION_PHASE" || !selectedActionType || !actionTarget) return;
+    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !selectedActionType || !actionTarget) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -240,7 +279,7 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
         bus: activeBusType,
         target: actionTarget,
       } as TurnAction;
-      await submitAction(roomCode, activePlayerId, [action]);
+      await submitAction(roomCode, resolvedPlayerId, [action], activeBusType);
       setSelectedActionType(null);
       setActionTarget(null);
     } catch (e: any) {
@@ -252,11 +291,11 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
 
   // Handle Skipping Action
   const handleActionPass = async () => {
-    if (!activePlayerId || status !== "ACTION_PHASE") return;
+    if (!resolvedPlayerId || status !== "ACTION_PHASE") return;
     setSubmitting(true);
     setErrorMsg("");
     try {
-      await submitAction(roomCode, activePlayerId, []);
+      await submitAction(roomCode, resolvedPlayerId, [], activeBusType);
       setSelectedActionType(null);
       setActionTarget(null);
     } catch (e: any) {
@@ -267,17 +306,25 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
   };
 
   const handlePass = async () => {
-    if (!activePlayerId || status !== "CHOOSING") return;
+    if (!resolvedPlayerId || status !== "CHOOSING") return;
     setSubmitting(true);
     setErrorMsg("");
     try {
-      await submitAction(roomCode, activePlayerId, []);
+      await submitAction(roomCode, resolvedPlayerId, [], chosenBus);
       setSelectedMoves([]);
     } catch (e: any) {
       setErrorMsg(e.message || "이동 패스에 실패했습니다.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Role subtitle text
+  const getRoleSubtitle = () => {
+    if (isPlusController && isMinusController) return "(PLUS & MINUS 버스 제어)";
+    if (isPlusController) return "(PLUS 버스 제어)";
+    if (isMinusController) return "(MINUS 버스 제어)";
+    return "(대기 중)";
   };
 
   return (
@@ -311,308 +358,329 @@ export default function DealerRoom({ roomCode }: { roomCode: string }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
           <section className="dealer-panel dealer-hand-pane">
-          <div className="active-player-card">
-            <span>현재 차례</span>
-            <h2 className="dealer-title" style={{ color: `var(--team-${teamCssName})` }}>
-              {playerName ?? "대기 중"}
-            </h2>
-            {team && (
-              <div className="team-pill">
-                <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
-                <span className="brand-font">{team}</span>
+            <div className="active-player-card">
+              <span>현재 차례</span>
+              <h2 className="dealer-title" style={{ color: `var(--team-${teamCssName})` }}>
+                {playerName ?? "대기 중"}
+              </h2>
+              <div style={{ fontSize: "0.85rem", fontWeight: "bold", color: "var(--text-secondary)", marginTop: 4 }}>
+                {getRoleSubtitle()}
               </div>
-            )}
-          </div>
-
-          {errorMsg && <div className="error-box">{errorMsg}</div>}
-
-          {!activePlayerId || status === "LOBBY" ? (
-            <div className="dealer-wait-card">
-              <h3 className="brand-font">딜러룸 대기</h3>
-              <p>마스터 페이지에서 사람을 입력하고 게임을 시작하면 현재 차례의 카드패가 여기에 표시됩니다.</p>
-            </div>
-          ) : !canAct ? (
-            <div className="dealer-wait-card">
-              <h3 className="brand-font">{STATUS_TEXT[status] || "대기 중"}</h3>
-              <p>마스터가 입력을 시작하면 이 화면에서 현재 차례 사람이 카드를 선택합니다.</p>
-            </div>
-          ) : (
-            <>
-              {status === "CHOOSING" ? (
-                <>
-                  <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
-                    <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 1: 이동 수단 및 버스 지정</h3>
-                  </div>
-
-                  {/* 1. Bus Selection */}
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: 8, color: "var(--text-secondary)" }}>
-                      움직일 버스 선택
-                    </label>
-                    <div className="tile-action-options">
-                      <button
-                        type="button"
-                        className={`tile-action-btn ${chosenBus === BusType.PLUS ? "tile-action-btn-active" : ""}`}
-                        style={{
-                          background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                          borderColor: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                          color: chosenBus === BusType.PLUS ? "white" : undefined,
-                        }}
-                        onClick={() => setChosenBus(BusType.PLUS)}
-                        disabled={submitting}
-                      >
-                        ＋ PLUS 버스
-                      </button>
-                      <button
-                        type="button"
-                        className={`tile-action-btn ${chosenBus === BusType.MINUS ? "tile-action-btn-active" : ""}`}
-                        style={{
-                          background: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                          borderColor: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                          color: chosenBus === BusType.MINUS ? "white" : undefined,
-                        }}
-                        onClick={() => setChosenBus(BusType.MINUS)}
-                        disabled={submitting}
-                      >
-                        ー MINUS 버스
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 2. Move Category Tab */}
-                  <div className="action-mode-tabs" style={{ marginBottom: 20 }}>
-                    <button
-                      className={`mode-tab ${moveCategory === "FORWARD" ? "mode-tab-active" : ""}`}
-                      type="button"
-                      onClick={() => setMoveCategory("FORWARD")}
-                      disabled={submitting}
-                    >
-                      직진 (Move Forward)
-                    </button>
-                    <button
-                      className={`mode-tab ${moveCategory === "ROTATE" ? "mode-tab-active" : ""}`}
-                      type="button"
-                      onClick={() => setMoveCategory("ROTATE")}
-                      disabled={submitting}
-                    >
-                      회전 (Rotate)
-                    </button>
-                  </div>
-
-                  {/* 3. Card Sub-options */}
-                  <div className="grouped-cards-container" style={{ marginBottom: 20 }}>
-                    {moveCategory === "FORWARD" ? (
-                      <>
-                        {(["STRAIGHT1", "STRAIGHT2", "STRAIGHT3"] as const).map((kind) => {
-                          const count = getCardCount(kind);
-                          const isDisabled = count <= 0 || selectedMoves.length >= 3 || submitting;
-                          return (
-                            <div
-                              key={kind}
-                              className={`grouped-card-row ${isDisabled ? "disabled" : ""}`}
-                              onClick={() => handleCardClick(kind)}
-                            >
-                              <div className="grouped-card-info">
-                                <span style={{ fontSize: "1.3rem" }}>{CARD_ICONS[kind]}</span>
-                                <div>
-                                  <strong style={{ fontSize: "0.95rem" }}>{CARD_NAMES[kind]}</strong>
-                                </div>
-                              </div>
-                              <span className="grouped-card-badge">{count}장 남음</span>
-                            </div>
-                          );
-                        })}
-                      </>
-                    ) : (
-                      <>
-                        {(["LEFT", "RIGHT"] as const).map((kind) => {
-                          const count = getCardCount(kind);
-                          const isDisabled = count <= 0 || selectedMoves.length >= 3 || submitting;
-                          return (
-                            <div
-                              key={kind}
-                              className={`grouped-card-row ${isDisabled ? "disabled" : ""}`}
-                              onClick={() => handleCardClick(kind)}
-                            >
-                              <div className="grouped-card-info">
-                                <span style={{ fontSize: "1.3rem" }}>{CARD_ICONS[kind]}</span>
-                                <div>
-                                  <strong style={{ fontSize: "0.95rem" }}>{CARD_NAMES[kind]}</strong>
-                                </div>
-                              </div>
-                              <span className="grouped-card-badge">{count}장 남음</span>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                  </div>
-
-                  {/* 4. Selection Tray */}
-                  <div className="selected-tray" style={{ marginTop: 8 }}>
-                    {selectedMoves.length === 0 ? (
-                      <div className="selected-empty">이동 방식(직진/회전)을 누르고 카드를 골라 선택하세요 (최대 3장)</div>
-                    ) : (
-                      selectedMoves.map((kind, i) => (
-                        <div
-                          key={i}
-                          className="selected-chip"
-                          style={{
-                            background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
-                            boxShadow: chosenBus === BusType.PLUS ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
-                          }}
-                        >
-                          <span>
-                            {CARD_ICONS[kind]} {CARD_NAMES[kind]}
-                          </span>
-                          <button
-                            className="chip-remove"
-                            onClick={() => setSelectedMoves((prev) => prev.filter((_, idx) => idx !== i))}
-                            disabled={submitting}
-                            type="button"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="dealer-submit-row" style={{ marginTop: 24 }}>
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleMoveSubmit}
-                      disabled={submitting}
-                      style={{ width: "100%" }}
-                    >
-                      {submitting ? "버스 이동하는 중..." : selectedMoves.length === 0 ? "이동 없이 행동 단계로" : "이동 제출 & 행동 단계로"}
-                    </button>
-                    <button className="btn btn-ghost" onClick={handlePass} disabled={submitting} style={{ width: "100%" }}>
-                      이동 패스하기
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="tile-action-panel">
-                  <div className="dealer-pane-heading" style={{ marginBottom: 12 }}>
-                    <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 2: 행동 선택</h3>
-                  </div>
-                  <p className="dealer-subtitle" style={{ marginBottom: 16 }}>
-                    이동이 적용되었습니다. <strong>{activeBusType === BusType.PLUS ? "PLUS" : "MINUS"} 버스</strong> 위치 (
-                    {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
-                  </p>
-
-                  <div className="tile-action-options" style={{ marginBottom: 20 }}>
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${selectedActionType === "SWAP_TILE" ? "tile-action-btn-active" : ""}`}
-                      onClick={() => {
-                        setSelectedActionType("SWAP_TILE");
-                        setActionTarget(null);
-                      }}
-                    >
-                      타일 색상 교체
-                    </button>
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${selectedActionType === "PLACE_OBSTACLE" ? "tile-action-btn-active" : ""}`}
-                      onClick={() => {
-                        setSelectedActionType("PLACE_OBSTACLE");
-                        setActionTarget(null);
-                      }}
-                    >
-                      장애물 설치
-                    </button>
-                  </div>
-
-                  {selectedActionType ? (
-                    <div className="action-phase-section">
-                      <p className="dealer-subtitle" style={{ textAlign: "center" }}>
-                        {selectedActionType === "SWAP_TILE"
-                          ? "아래 9칸 중 한 칸을 클릭하면 현재 버스 타일의 색상이 그 타일의 색상으로 바뀝니다."
-                          : "상하좌우 4칸 중 벽(장애물)이 없는 칸을 선택하여 설치하세요."}
-                      </p>
-
-                      <div className="action-grid-3x3">
-                        {gridCells.map(({ dx, dy, tx, ty, tile, inBounds }, index) => {
-                          const isCenter = dx === 0 && dy === 0;
-                          const isOrthogonal = Math.abs(dx) + Math.abs(dy) === 1;
-
-                          // Hide diagonal cells for obstacle placement mode to avoid clutter
-                          if (selectedActionType === "PLACE_OBSTACLE" && !isOrthogonal && !isCenter) {
-                            return <div key={index} style={{ aspectRatio: 1 }} />;
-                          }
-
-                          // Check if there is already a wall between the bus and this cell
-                          const hasExistingWall = (() => {
-                            if (!inBounds || !isOrthogonal) return false;
-                            try {
-                              const segment = wallBetweenTiles(activeBusPos, { x: tx, y: ty });
-                              const allWalls = [
-                                ...game.buses.PLUS.walls,
-                                ...game.buses.MINUS.walls,
-                              ];
-                              return allWalls.some((w: any) =>
-                                (w.from.x === segment.from.x && w.from.y === segment.from.y && w.to.x === segment.to.x && w.to.y === segment.to.y) ||
-                                (w.from.x === segment.to.x && w.from.y === segment.to.y && w.to.x === segment.from.x && w.to.y === segment.from.y)
-                              );
-                            } catch {
-                              return false;
-                            }
-                          })();
-
-                          const isSelected = actionTarget?.x === tx && actionTarget?.y === ty;
-                          const isCellDisabled =
-                            !inBounds ||
-                            (selectedActionType === "PLACE_OBSTACLE" && (!isOrthogonal || hasExistingWall));
-
-                          return (
-                            <button
-                              key={index}
-                              type="button"
-                              disabled={isCellDisabled}
-                              className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
-                                isSelected ? "selected" : ""
-                              } ${isCellDisabled ? "disabled" : ""}`}
-                              onClick={() => {
-                                setActionTarget({ x: tx, y: ty });
-                              }}
-                            >
-                              {hasExistingWall && <span style={{ fontSize: "0.8rem" }}>🚧</span>}
-                              {isCenter && <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "white", textShadow: "0 1px 2px black" }}>🚌</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text-secondary)" }}>
-                      행동 유형(타일 교체 또는 장애물 설치)을 선택하세요
-                    </div>
-                  )}
-
-                  <div className="dealer-submit-row" style={{ marginTop: 24 }}>
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleActionSubmit}
-                      disabled={submitting || !selectedActionType || !actionTarget}
-                      style={{ flex: 2 }}
-                    >
-                      {submitting ? "제출 중..." : "행동 제출 & 차례 마치기"}
-                    </button>
-                    <button
-                      className="btn btn-ghost"
-                      onClick={handleActionPass}
-                      disabled={submitting}
-                      style={{ flex: 1 }}
-                    >
-                      행동 패스
-                    </button>
-                  </div>
+              {team && (
+                <div className="team-pill" style={{ marginTop: 8 }}>
+                  <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
+                  <span className="brand-font">{team}</span>
                 </div>
               )}
-            </>
-          )}
+            </div>
+
+            {errorMsg && <div className="error-box">{errorMsg}</div>}
+
+            {!resolvedPlayerId || status === "LOBBY" ? (
+              <div className="dealer-wait-card">
+                <h3 className="brand-font">딜러룸 대기</h3>
+                <p>마스터 페이지에서 사람을 입력하고 게임을 시작하면 현재 차례의 카드패가 여기에 표시됩니다.</p>
+              </div>
+            ) : status === "CHOOSING" && hasISubmittedMoves ? (
+              <div className="dealer-wait-card">
+                <h3 className="brand-font" style={{ color: "var(--bus-plus)" }}>이동 제출 완료!</h3>
+                <p style={{ marginTop: 8 }}>상대방 플레이어의 이동 카드 제출을 기다리고 있습니다...</p>
+                <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>PLUS 버스 제출 상태: {isPlusSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>MINUS 버스 제출 상태: {isMinusSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                </div>
+              </div>
+            ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
+              <div className="dealer-wait-card">
+                <h3 className="brand-font" style={{ color: "var(--bus-minus)" }}>행동 제출 완료!</h3>
+                <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교체/장애물) 제출을 기다리고 있습니다...</p>
+                <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>PLUS 버스 행동 제출: {isPlusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>MINUS 버스 행동 제출: {isMinusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                </div>
+              </div>
+            ) : !canAct ? (
+              <div className="dealer-wait-card">
+                <h3 className="brand-font">{STATUS_TEXT[status] || "대기 중"}</h3>
+                <p>상대방 차례이거나 마스터 대기 중입니다. 차례가 돌아오면 활성화됩니다.</p>
+              </div>
+            ) : (
+              <>
+                {status === "CHOOSING" ? (
+                  <>
+                    <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
+                      <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 1: 이동 수단 및 버스 지정</h3>
+                    </div>
+
+                    {/* 1. Bus Selection (Disabled if locked to PLUS or MINUS role) */}
+                    <div style={{ marginBottom: 20 }}>
+                      <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: 8, color: "var(--text-secondary)" }}>
+                        움직일 버스 선택
+                      </label>
+                      <div className="tile-action-options">
+                        <button
+                          type="button"
+                          className={`tile-action-btn ${chosenBus === BusType.PLUS ? "tile-action-btn-active" : ""}`}
+                          style={{
+                            background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
+                            borderColor: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
+                            color: chosenBus === BusType.PLUS ? "white" : undefined,
+                          }}
+                          onClick={() => setChosenBus(BusType.PLUS)}
+                          disabled={plusBusDisabled}
+                        >
+                          ＋ PLUS 버스
+                        </button>
+                        <button
+                          type="button"
+                          className={`tile-action-btn ${chosenBus === BusType.MINUS ? "tile-action-btn-active" : ""}`}
+                          style={{
+                            background: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
+                            borderColor: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
+                            color: chosenBus === BusType.MINUS ? "white" : undefined,
+                          }}
+                          onClick={() => setChosenBus(BusType.MINUS)}
+                          disabled={minusBusDisabled}
+                        >
+                          ー MINUS 버스
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Move Category Tab */}
+                    <div className="action-mode-tabs" style={{ marginBottom: 20 }}>
+                      <button
+                        className={`mode-tab ${moveCategory === "FORWARD" ? "mode-tab-active" : ""}`}
+                        type="button"
+                        onClick={() => setMoveCategory("FORWARD")}
+                        disabled={submitting}
+                      >
+                        직진 (Move Forward)
+                      </button>
+                      <button
+                        className={`mode-tab ${moveCategory === "ROTATE" ? "mode-tab-active" : ""}`}
+                        type="button"
+                        onClick={() => setMoveCategory("ROTATE")}
+                        disabled={submitting}
+                      >
+                        회전 (Rotate)
+                      </button>
+                    </div>
+
+                    {/* 3. Card Sub-options */}
+                    <div className="grouped-cards-container" style={{ marginBottom: 20 }}>
+                      {moveCategory === "FORWARD" ? (
+                        <>
+                          {(["STRAIGHT1", "STRAIGHT2", "STRAIGHT3"] as const).map((kind) => {
+                            const count = getCardCount(kind);
+                            const isDisabled = count <= 0 || selectedMoves.length >= 3 || submitting;
+                            return (
+                              <div
+                                key={kind}
+                                className={`grouped-card-row ${isDisabled ? "disabled" : ""}`}
+                                onClick={() => handleCardClick(kind)}
+                              >
+                                <div className="grouped-card-info">
+                                  <span style={{ fontSize: "1.3rem" }}>{CARD_ICONS[kind]}</span>
+                                  <div>
+                                    <strong style={{ fontSize: "0.95rem" }}>{CARD_NAMES[kind]}</strong>
+                                  </div>
+                                </div>
+                                <span className="grouped-card-badge">{count}장 남음</span>
+                              </div>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <>
+                          {(["LEFT", "RIGHT"] as const).map((kind) => {
+                            const count = getCardCount(kind);
+                            const isDisabled = count <= 0 || selectedMoves.length >= 3 || submitting;
+                            return (
+                              <div
+                                key={kind}
+                                className={`grouped-card-row ${isDisabled ? "disabled" : ""}`}
+                                onClick={() => handleCardClick(kind)}
+                              >
+                                <div className="grouped-card-info">
+                                  <span style={{ fontSize: "1.3rem" }}>{CARD_ICONS[kind]}</span>
+                                  <div>
+                                    <strong style={{ fontSize: "0.95rem" }}>{CARD_NAMES[kind]}</strong>
+                                  </div>
+                                </div>
+                                <span className="grouped-card-badge">{count}장 남음</span>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+
+                    {/* 4. Selection Tray */}
+                    <div className="selected-tray" style={{ marginTop: 8 }}>
+                      {selectedMoves.length === 0 ? (
+                        <div className="selected-empty">이동 방식(직진/회전)을 누르고 카드를 골라 선택하세요 (최대 3장)</div>
+                      ) : (
+                        selectedMoves.map((kind, i) => (
+                          <div
+                            key={i}
+                            className="selected-chip"
+                            style={{
+                              background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
+                              boxShadow: chosenBus === BusType.PLUS ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
+                            }}
+                          >
+                            <span>
+                              {CARD_ICONS[kind]} {CARD_NAMES[kind]}
+                            </span>
+                            <button
+                              className="chip-remove"
+                              onClick={() => setSelectedMoves((prev) => prev.filter((_, idx) => idx !== i))}
+                              disabled={submitting}
+                              type="button"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="dealer-submit-row" style={{ marginTop: 24 }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleMoveSubmit}
+                        disabled={submitting}
+                        style={{ width: "100%" }}
+                      >
+                        {submitting ? "버스 이동하는 중..." : selectedMoves.length === 0 ? "이동 없이 행동 단계로" : "이동 제출 & 행동 단계로"}
+                      </button>
+                      <button className="btn btn-ghost" onClick={handlePass} disabled={submitting} style={{ width: "100%" }}>
+                        이동 패스하기
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="tile-action-panel">
+                    <div className="dealer-pane-heading" style={{ marginBottom: 12 }}>
+                      <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 2: 행동 선택</h3>
+                    </div>
+                    <p className="dealer-subtitle" style={{ marginBottom: 16 }}>
+                      이동이 적용되었습니다. <strong>{activeBusType === BusType.PLUS ? "PLUS" : "MINUS"} 버스</strong> 위치 (
+                      {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
+                    </p>
+
+                    <div className="tile-action-options" style={{ marginBottom: 20 }}>
+                      <button
+                        type="button"
+                        className={`tile-action-btn ${selectedActionType === "SWAP_TILE" ? "tile-action-btn-active" : ""}`}
+                        onClick={() => {
+                          setSelectedActionType("SWAP_TILE");
+                          setActionTarget(null);
+                        }}
+                      >
+                        타일 색상 교체
+                      </button>
+                      <button
+                        type="button"
+                        className={`tile-action-btn ${selectedActionType === "PLACE_OBSTACLE" ? "tile-action-btn-active" : ""}`}
+                        onClick={() => {
+                          setSelectedActionType("PLACE_OBSTACLE");
+                          setActionTarget(null);
+                        }}
+                      >
+                        장애물 설치
+                      </button>
+                    </div>
+
+                    {selectedActionType ? (
+                      <div className="action-phase-section">
+                        <p className="dealer-subtitle" style={{ textAlign: "center" }}>
+                          {selectedActionType === "SWAP_TILE"
+                            ? "아래 9칸 중 한 칸을 클릭하면 현재 버스 타일의 색상과 그 타일의 색상이 서로 맞바뀝니다."
+                            : "상하좌우 4칸 중 벽(장애물)이 없는 칸을 선택하여 설치하세요."}
+                        </p>
+
+                        <div className="action-grid-3x3">
+                          {gridCells.map(({ dx, dy, tx, ty, tile, inBounds }, index) => {
+                            const isCenter = dx === 0 && dy === 0;
+                            const isOrthogonal = Math.abs(dx) + Math.abs(dy) === 1;
+
+                            // Hide diagonal cells for obstacle placement mode to avoid clutter
+                            if (selectedActionType === "PLACE_OBSTACLE" && !isOrthogonal && !isCenter) {
+                              return <div key={index} style={{ aspectRatio: 1 }} />;
+                            }
+
+                            // Check if there is already a wall between the bus and this cell
+                            const hasExistingWall = (() => {
+                              if (!inBounds || !isOrthogonal) return false;
+                              try {
+                                const segment = wallBetweenTiles(activeBusPos, { x: tx, y: ty });
+                                const allWalls = [
+                                  ...game.buses.PLUS.walls,
+                                  ...game.buses.MINUS.walls,
+                                ];
+                                return allWalls.some((w: any) =>
+                                  (w.from.x === segment.from.x && w.from.y === segment.from.y && w.to.x === segment.to.x && w.to.y === segment.to.y) ||
+                                  (w.from.x === segment.to.x && w.from.y === segment.to.y && w.to.x === segment.from.x && w.to.y === segment.from.y)
+                                );
+                              } catch {
+                                return false;
+                              }
+                            })();
+
+                            const isSelected = actionTarget?.x === tx && actionTarget?.y === ty;
+                            const isCellDisabled =
+                              !inBounds ||
+                              (selectedActionType === "PLACE_OBSTACLE" && (!isOrthogonal || hasExistingWall));
+
+                            return (
+                              <button
+                                key={index}
+                                type="button"
+                                disabled={isCellDisabled}
+                                className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
+                                  isSelected ? "selected" : ""
+                                } ${isCellDisabled ? "disabled" : ""}`}
+                                onClick={() => {
+                                  setActionTarget({ x: tx, y: ty });
+                                }}
+                              >
+                                {hasExistingWall && <span style={{ fontSize: "0.8rem" }}>🚧</span>}
+                                {isCenter && <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "white", textShadow: "0 1px 2px black" }}>🚌</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text-secondary)" }}>
+                        행동 유형(타일 교체 또는 장애물 설치)을 선택하세요
+                      </div>
+                    )}
+
+                    <div className="dealer-submit-row" style={{ marginTop: 24 }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleActionSubmit}
+                        disabled={submitting || !selectedActionType || !actionTarget}
+                        style={{ flex: 2 }}
+                      >
+                        {submitting ? "제출 중..." : "행동 제출 & 차례 마치기"}
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={handleActionPass}
+                        disabled={submitting}
+                        style={{ flex: 1 }}
+                      >
+                        행동 패스
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </section>
 
           <section className="dealer-panel">

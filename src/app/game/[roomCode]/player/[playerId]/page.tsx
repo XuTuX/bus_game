@@ -1,10 +1,10 @@
-import { redirect } from "next/navigation";
+import DealerRoom from "@/components/DealerRoom";
 
-export default async function LegacyDealerRoomPage({
+export default async function PlayerDealerRoomPage({
   params,
 }: {
   params: Promise<{ roomCode: string; playerId: string }>;
 }) {
-  const { roomCode } = await params;
-  redirect(`/dealer/${roomCode}`);
+  const { roomCode, playerId } = await params;
+  return <DealerRoom roomCode={roomCode} playerId={playerId} />;
 }

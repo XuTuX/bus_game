@@ -39,8 +39,7 @@ export default function PublicBoardPage({
     );
   }
 
-  const { game, participants, logs, status, activePlayerId } = state;
-  const activePlayer = game.players.find((p) => p.id === activePlayerId);
+  const { game, participants, logs, status, activePlayerNames } = state;
 
   return (
     <div className="public-layout">
@@ -55,7 +54,7 @@ export default function PublicBoardPage({
           <div className="public-status">{STATUS_LABELS[status]}</div>
           <div className="status-metadata">
             <span>라운드 {Math.min(game.roundIndex + 1, 5)} / 5</span>
-            <span>현재 차례 {activePlayer?.name ?? activePlayer?.id ?? "-"}</span>
+            <span>현재 차례 {activePlayerNames || "-"}</span>
           </div>
         </div>
 
@@ -87,7 +86,7 @@ export default function PublicBoardPage({
                 <div
                   key={player.id}
                   className={`player-row ${
-                    player.id === activePlayerId ? "player-row-active" : ""
+                    (player.name && activePlayerNames?.includes(player.name)) ? "player-row-active" : ""
                   }`}
                 >
                   <div className="player-identity">

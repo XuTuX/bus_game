@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import { type LobbyParticipant, type RoomState } from "@/server/gameStore";
-import { type Card, type Colour, type TurnAction } from "@/lib/game";
+import { type Card, type Colour, type TurnAction, BusType } from "@/lib/game";
 
 export type PublicStateResult = {
   game: RoomState["game"];
   participants: LobbyParticipant[];
   logs: RoomState["logs"];
   status: RoomState["status"];
-  activePlayerId: string | null;
+  activePlayerNames: string | null;
+  pendingMoves?: {
+    PLUS: boolean;
+    MINUS: boolean;
+  };
+  pendingActions?: {
+    PLUS: boolean;
+    MINUS: boolean;
+  };
 };
 
 export type PrivateStateResult = {
@@ -16,6 +24,8 @@ export type PrivateStateResult = {
   status: RoomState["status"];
   team?: Colour;
   playerName?: string;
+  isPlusController?: boolean;
+  isMinusController?: boolean;
 };
 
 export function usePublicGame(roomCode: string) {
@@ -74,12 +84,13 @@ export function usePrivateGame(roomCode: string, playerId: string) {
 export async function submitAction(
   roomCode: string,
   playerId: string,
-  actions: TurnAction[]
+  actions: TurnAction[],
+  bus?: BusType
 ) {
   const res = await fetch(`/api/game/${roomCode}/action`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId, actions }),
+    body: JSON.stringify({ playerId, actions, bus }),
   });
   
   if (!res.ok) {

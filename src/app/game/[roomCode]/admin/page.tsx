@@ -59,8 +59,7 @@ export default function AdminPage({
     );
   }
 
-  const { status, activePlayerId, game, participants, logs } = state;
-  const activePlayer = game.players.find((p) => p.id === activePlayerId);
+  const { status, game, participants, logs, activePlayerNames } = state;
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
     action: "start_game" | "start" | "reveal" | "next"
@@ -122,6 +121,15 @@ export default function AdminPage({
     }
   };
 
+  const plusTeamColor = status !== "LOBBY" ? COLOURS[game.turnIndex] : null;
+  const minusTeamColor = status !== "LOBBY" ? COLOURS[game.turnIndex] : null;
+
+  const teamPlayersPlus = plusTeamColor ? game.players.filter((p) => p.team === plusTeamColor) : [];
+  const teamPlayersMinus = minusTeamColor ? game.players.filter((p) => p.team === minusTeamColor) : [];
+
+  const plusPlayer = teamPlayersPlus[0];
+  const minusPlayer = teamPlayersMinus[1] || teamPlayersMinus[0];
+
   return (
     <div className="dealer-layout">
       <header className="header">
@@ -131,10 +139,17 @@ export default function AdminPage({
             방 코드 <strong>{roomCode}</strong> · {STATUS_LABELS[status]}
           </p>
         </div>
-        <div className="header-actions">
-          <Link href={`/dealer/${roomCode}`} className="btn btn-primary" target="_blank" rel="noopener noreferrer">
-            딜러룸
-          </Link>
+        <div className="header-actions" style={{ gap: 8 }}>
+          {plusPlayer && (
+            <Link href={`/game/${roomCode}/player/${plusPlayer.id}`} className="btn btn-primary" target="_blank" rel="noopener noreferrer" style={{ background: "var(--bus-plus)", borderColor: "var(--bus-plus)", color: "white" }}>
+              딜러룸 ＋ ({plusPlayer.name})
+            </Link>
+          )}
+          {minusPlayer && (
+            <Link href={`/game/${roomCode}/player/${minusPlayer.id}`} className="btn btn-primary" target="_blank" rel="noopener noreferrer" style={{ background: "var(--bus-minus)", borderColor: "var(--bus-minus)", color: "white" }}>
+              딜러룸 ー ({minusPlayer.name})
+            </Link>
+          )}
           <Link href={`/game/${roomCode}`} className="btn btn-ghost" target="_blank" rel="noopener noreferrer">
             공개판
           </Link>
@@ -158,7 +173,7 @@ export default function AdminPage({
             </div>
             <div>
               <span>현재 차례</span>
-              <strong>{activePlayer?.name ?? activePlayer?.id ?? "-"}</strong>
+              <strong>{activePlayerNames || "-"}</strong>
             </div>
             <div>
               <span>상태</span>
@@ -221,7 +236,7 @@ export default function AdminPage({
                 {status === "CHOOSING" ? "딜러룸 이동 입력 중" : "딜러룸 행동 입력 중"}
               </h2>
               <p>
-                {activePlayer?.name ?? activePlayer?.id} 님이 제출하면 바로 공개판에 반영됩니다.
+                {activePlayerNames} 님이 제출하면 바로 공개판에 반영됩니다.
               </p>
             </div>
           )}

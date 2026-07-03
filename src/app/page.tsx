@@ -111,14 +111,7 @@ export default function Home() {
               >
                 마스터
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={loading || roomCode.trim().length !== 4}
-                onClick={() => handleOpenRoomPage("dealer")}
-              >
-                딜러룸
-              </button>
+
               <button
                 type="button"
                 className="btn btn-ghost"

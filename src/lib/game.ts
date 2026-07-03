@@ -314,10 +314,6 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
   if (isGameOver(game)) {
     throw new Error("Game is already over");
   }
-  const active = nextPlayer(game);
-  if (active.id !== player.id) {
-    throw new Error(`It is ${active.id}'s turn, not ${player.id}'s`);
-  }
 
   // Validate moves
   if (actions.length > 3) {
@@ -341,11 +337,7 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
     const result = step(bus, card, game.board, action.bus, otherWalls);
     if (result.applied && result.path) {
       result.scoreGained = scorePathTiles(result.path, action.bus, game);
-      const newRegions = floodFillRegions(bus, game.board, action.bus);
-      for (const region of newRegions) {
-        scoreRegion(region, game);
-      }
-      result.regions = newRegions;
+      result.regions = [];
     }
     results.push(result);
   }
@@ -359,10 +351,6 @@ export function runActionPhase(
 ): StepResult {
   if (isGameOver(game)) {
     throw new Error("Game is already over");
-  }
-  const active = nextPlayer(game);
-  if (active.id !== player.id) {
-    throw new Error(`It is ${active.id}'s turn, not ${player.id}'s`);
   }
 
   let result: StepResult = { applied: true, regions: [] };
@@ -400,7 +388,6 @@ export function runActionPhase(
     }
   }
 
-  game.turnIndex = (game.turnIndex + 1) % game.players.length;
   return result;
 }
 
@@ -827,4 +814,58 @@ function countColours(board: Tile[][]): Map<Colour, number> {
     }
   }
   return counts;
+}
+
+export function getConnectedComponentSize(
+  start: Coord,
+  board: Tile[][],
+  allWalls: Wall[]
+): number {
+  const targetColor = board[start.y]?.[start.x]?.colour;
+  if (!targetColor) return 0;
+
+  const visited = new Set<string>();
+  const queue: Coord[] = [start];
+  visited.add(`${start.x},${start.y}`);
+
+  let count = 0;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    count++;
+
+    const neighbors = [
+      { x: current.x, y: current.y - 1 },
+      { x: current.x + 1, y: current.y },
+      { x: current.x, y: current.y + 1 },
+      { x: current.x - 1, y: current.y },
+    ];
+
+    for (const next of neighbors) {
+      const nextKey = `${next.x},${next.y}`;
+      if (visited.has(nextKey)) continue;
+
+      if (next.x < 0 || next.x >= board.length || next.y < 0 || next.y >= board.length) {
+        continue;
+      }
+
+      if (board[next.y][next.x].colour !== targetColor) {
+        continue;
+      }
+
+      try {
+        const segment = wallBetweenTiles(current, next);
+        if (wallConflicts(segment, allWalls)) {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+
+      visited.add(nextKey);
+      queue.push(next);
+    }
+  }
+
+  return count;
 }

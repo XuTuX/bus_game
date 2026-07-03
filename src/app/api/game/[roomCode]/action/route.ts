@@ -9,9 +9,10 @@ export async function POST(
   try {
     const { roomCode } = await params;
     const body = await request.json();
-    const { playerId, actions } = body as {
+    const { playerId, actions, bus } = body as {
       playerId: string;
       actions: TurnAction[];
+      bus?: any;
     };
 
     if (!playerId) {
@@ -21,7 +22,7 @@ export async function POST(
       );
     }
 
-    submitTurn(roomCode, playerId, actions || []);
+    submitTurn(roomCode, playerId, actions || [], bus);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
