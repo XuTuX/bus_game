@@ -4,7 +4,7 @@ import { use } from "react";
 import ActionLog from "@/components/ActionLog";
 import Board from "@/components/Board";
 import ScoreBoard from "@/components/ScoreBoard";
-import { getPhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
+import { usePhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
 import { MAX_PLAYERS, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
@@ -30,6 +30,7 @@ export default function PublicBoardPage({
 }) {
   const { roomCode } = use(params);
   const state = usePublicGame(roomCode);
+  const phaseTimeLabel = usePhaseTimeLabel(state);
 
   if (!state) {
     return (
@@ -40,7 +41,6 @@ export default function PublicBoardPage({
   }
 
   const { game, participants, logs, status, activePlayerNames } = state;
-  const phaseTimeLabel = getPhaseTimeLabel(state);
 
   return (
     <div className="public-layout">

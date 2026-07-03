@@ -110,6 +110,24 @@ export function getPhaseTimeLabel(state?: TimingState | null): string | null {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+export function usePhaseTimeLabel(state?: TimingState | null): string | null {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!state?.phaseDeadlineAt) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTick((tick) => tick + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [state?.phaseDeadlineAt]);
+
+  return getPhaseTimeLabel(state);
+}
+
 export async function submitAction(
   roomCode: string,
   playerId: string,

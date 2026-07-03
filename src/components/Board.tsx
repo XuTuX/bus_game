@@ -10,9 +10,11 @@ const FACING_ROTATION: Record<string, number> = {
 export default function Board({
   game,
   showFacing = false,
+  showFacingFor,
 }: {
   game: GameState;
   showFacing?: boolean;
+  showFacingFor?: BusType;
 }) {
   const tileSize = 56;
   const tileGap = 3;
@@ -99,9 +101,12 @@ export default function Board({
       </svg>
 
       {Object.entries(game.buses).map(([busType, busState]) => {
+        const typedBusType = busType as BusType;
+        const shouldShowFacing =
+          showFacing && (!showFacingFor || showFacingFor === typedBusType);
         const step = tileSize + tileGap;
-        const width = showFacing ? 38 : 28;
-        const height = showFacing ? 26 : 28;
+        const width = shouldShowFacing ? 38 : 28;
+        const height = shouldShowFacing ? 26 : 28;
         const left = 12 + busState.pos.x * step + tileSize / 2 - width / 2;
         const top = 12 + busState.pos.y * step + tileSize / 2 - height / 2;
         const offset = busType === BusType.PLUS ? -4 : 4;
@@ -111,18 +116,18 @@ export default function Board({
           <div
             key={busType}
             className={`bus-marker bus-marker-${busType} ${
-              !showFacing ? "bus-marker-round" : ""
+              !shouldShowFacing ? "bus-marker-round" : ""
             }`}
             style={{
               left: left + offset,
               top: top + offset,
-              transform: showFacing ? `rotate(${rotation}deg)` : "none",
+              transform: shouldShowFacing ? `rotate(${rotation}deg)` : "none",
             }}
           >
             <span className="bus-marker-label">
               {busType === BusType.PLUS ? "+" : "-"}
             </span>
-            {showFacing && <span className="bus-marker-head" />}
+            {shouldShowFacing && <span className="bus-marker-head" />}
           </div>
         );
       })}

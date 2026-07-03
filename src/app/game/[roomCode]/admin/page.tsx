@@ -12,7 +12,7 @@ import {
   adminRemovePlayer,
   adminSetTimers,
   adminSetPlayerColour,
-  getPhaseTimeLabel,
+  usePhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
 import { COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
@@ -48,6 +48,7 @@ export default function AdminPage({
 }) {
   const { roomCode } = use(params);
   const state = usePublicGame(roomCode);
+  const phaseTimeLabel = usePhaseTimeLabel(state);
   const [playerName, setPlayerName] = useState("");
   const [editingPlayers, setEditingPlayers] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
@@ -67,6 +68,49 @@ export default function AdminPage({
     timerDirty,
   ]);
 
+  useEffect(() => {
+    if (!timerDirty) return;
+
+    const moveValue = Number(moveMinutes);
+    const actionValue = Number(actionMinutes);
+    if (
+      !Number.isFinite(moveValue) ||
+      !Number.isFinite(actionValue) ||
+      moveValue < 1 ||
+      actionValue < 1
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      setSavingTimers(true);
+      setErrorMsg("");
+      try {
+        await adminSetTimers(roomCode, {
+          movePhaseSeconds: Math.round(moveValue * 60),
+          actionPhaseSeconds: Math.round(actionValue * 60),
+        });
+        if (!cancelled) {
+          setTimerDirty(false);
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setErrorMsg(error.message || "시간 설정 저장에 실패했습니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSavingTimers(false);
+        }
+      }
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [actionMinutes, moveMinutes, roomCode, timerDirty]);
+
   if (!state) {
     return (
       <div className="dealer-layout loading-screen">
@@ -76,7 +120,6 @@ export default function AdminPage({
   }
 
   const { status, game, participants, logs, activePlayerNames } = state;
-  const phaseTimeLabel = getPhaseTimeLabel(state);
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
     action: "start_game" | "start" | "reveal" | "next"
@@ -135,25 +178,6 @@ export default function AdminPage({
       setErrorMsg(error.message || "색상 변경에 실패했습니다.");
     } finally {
       setEditingPlayers(false);
-    }
-  };
-
-  const handleTimerSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (savingTimers) return;
-
-    setSavingTimers(true);
-    setErrorMsg("");
-    try {
-      await adminSetTimers(roomCode, {
-        movePhaseSeconds: Math.round(Number(moveMinutes) * 60),
-        actionPhaseSeconds: Math.round(Number(actionMinutes) * 60),
-      });
-      setTimerDirty(false);
-    } catch (error: any) {
-      setErrorMsg(error.message || "시간 설정 저장에 실패했습니다.");
-    } finally {
-      setSavingTimers(false);
     }
   };
 
@@ -231,7 +255,7 @@ export default function AdminPage({
             )}
           </div>
 
-          <form className="timer-settings-form" onSubmit={handleTimerSubmit}>
+          <div className="timer-settings-form">
             <label>
               <span>이동 시간</span>
               <input
@@ -262,14 +286,10 @@ export default function AdminPage({
               />
               <small>분</small>
             </label>
-            <button
-              className="btn btn-primary compact-btn"
-              disabled={savingTimers || !timerDirty}
-              type="submit"
-            >
-              {savingTimers ? "저장 중" : "시간 저장"}
-            </button>
-          </form>
+            <div className="timer-save-state">
+              {savingTimers ? "저장 중" : timerDirty ? "자동 저장 대기" : "저장됨"}
+            </div>
+          </div>
 
           {errorMsg && <div className="error-box">{errorMsg}</div>}
 

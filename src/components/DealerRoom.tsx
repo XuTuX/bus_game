@@ -18,8 +18,8 @@ import {
   type GameState,
 } from "@/lib/game";
 import {
-  getPhaseTimeLabel,
   submitAction,
+  usePhaseTimeLabel,
   usePrivateGame,
   usePublicGame,
 } from "@/lib/useGameState";
@@ -52,7 +52,7 @@ const STATUS_TEXT = {
   LOBBY: "마스터가 사람을 입력하는 중입니다.",
   WAITING: "마스터가 딜러룸 입력을 시작할 때까지 대기하세요.",
   CHOOSING: "현재 차례입니다. 이동 옵션을 선택하고 제출하세요.",
-  ACTION_PHASE: "이동이 완료되었습니다. 행동(교체/장애물)을 선택하세요.",
+  ACTION_PHASE: "이동이 완료되었습니다. 행동(교환/장애물)을 선택하세요.",
   SUBMITTED: "제출 처리 중입니다.",
   REVEALED: "결과가 공개되었습니다.",
   GAME_OVER: "게임이 종료되었습니다.",
@@ -104,6 +104,7 @@ export default function DealerRoom({
   }
 
   const privateState = usePrivateGame(roomCode, resolvedPlayerId);
+  const phaseTimeLabel = usePhaseTimeLabel(publicState);
   
   // Simulated state for step-by-step client-side movement animation
   const [animatedGame, setAnimatedGame] = useState<GameState | null>(null);
@@ -186,7 +187,6 @@ export default function DealerRoom({
 
   const game = publicState.game as GameState;
   const { status } = publicState;
-  const phaseTimeLabel = getPhaseTimeLabel(publicState);
   const activePlayer = game.players.find((player) => player.id === resolvedPlayerId);
   const hand = privateState?.hand ?? [];
   const activeTeam = privateState?.team ?? activePlayer?.team;
@@ -410,7 +410,11 @@ export default function DealerRoom({
               <span>버스 위치와 격자를 확인하세요</span>
             )}
           </div>
-          <Board game={displayGame} showFacing={!!animatedGame} />
+          <Board
+            game={displayGame}
+            showFacing={!!animatedGame}
+            showFacingFor={activeBusType}
+          />
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
@@ -450,7 +454,7 @@ export default function DealerRoom({
             ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font" style={{ color: "var(--bus-minus)" }}>행동 제출 완료!</h3>
-                <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교체/장애물) 제출을 기다리고 있습니다...</p>
+                <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                   <span>PLUS 버스 행동 제출: {isPlusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                   <span>MINUS 버스 행동 제출: {isMinusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
@@ -650,7 +654,7 @@ export default function DealerRoom({
                           setActionTarget(null);
                         }}
                       >
-                        타일 색상 교체
+                        타일 위치 교환
                       </button>
                       <button
                         type="button"
@@ -668,7 +672,7 @@ export default function DealerRoom({
                       <div className="action-phase-section">
                         <p className="dealer-subtitle" style={{ textAlign: "center" }}>
                           {selectedActionType === "SWAP_TILE"
-                            ? "아래 9칸 중 한 칸을 클릭하면 현재 버스 타일의 색상과 그 타일의 색상이 서로 맞바뀝니다."
+                            ? "아래 9칸 중 한 칸을 클릭하면 현재 버스 타일과 선택한 타일의 위치가 서로 바뀝니다."
                             : "상하좌우 4칸 중 벽(장애물)이 없는 칸을 선택하여 설치하세요."}
                         </p>
 
@@ -726,7 +730,7 @@ export default function DealerRoom({
                       </div>
                     ) : (
                       <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text-secondary)" }}>
-                        행동 유형(타일 교체 또는 장애물 설치)을 선택하세요
+                        행동 유형(타일 위치 교환 또는 장애물 설치)을 선택하세요
                       </div>
                     )}
 

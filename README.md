@@ -34,20 +34,38 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # bus_game
 
+## Game rules
+
+게임 규칙과 점수 계산 방식은 [GAME_RULES.md](./GAME_RULES.md)에 정리되어 있습니다.
+
 ## Vercel + Redis deployment
+
+자세한 Vercel/Redis 연결 절차와 운영 체크리스트는 [VERCEL_REDIS_SETUP.md](./VERCEL_REDIS_SETUP.md)에 정리되어 있습니다.
 
 This app stores live room state in Redis when Redis environment variables are
 present. Without them, it falls back to local memory for development.
 
-Create an Upstash Redis database, then set these environment variables in
-Vercel:
+Connect a Vercel Redis store, then pull the environment variables locally:
+
+```bash
+npx vercel link
+npx vercel env pull .env.development.local
+```
+
+The app uses `redis` with `REDIS_URL` first:
+
+```bash
+REDIS_URL=...
+ROOM_TTL_SECONDS=43200
+MOVE_PHASE_SECONDS=180
+ACTION_PHASE_SECONDS=120
+```
+
+Upstash REST-compatible variables are also supported as a fallback:
 
 ```bash
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
-ROOM_TTL_SECONDS=43200
-MOVE_PHASE_SECONDS=180
-ACTION_PHASE_SECONDS=120
 ```
 
 - `ROOM_TTL_SECONDS`: how long a room is kept after the last saved state.

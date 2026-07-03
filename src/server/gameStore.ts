@@ -1,3 +1,4 @@
+import { createClient, type RedisClientType } from "redis";
 import {
   Colour,
   COLOURS,
@@ -98,9 +99,11 @@ const roomTtlSeconds = getPositiveEnvNumber("ROOM_TTL_SECONDS", DEFAULT_ROOM_TTL
 const roomTtlMs = roomTtlSeconds * 1000;
 const movePhaseSeconds = getPositiveEnvNumber("MOVE_PHASE_SECONDS", DEFAULT_MOVE_PHASE_SECONDS);
 const actionPhaseSeconds = getPositiveEnvNumber("ACTION_PHASE_SECONDS", DEFAULT_ACTION_PHASE_SECONDS);
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+const redisConnectionUrl = process.env.REDIS_URL;
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
 const memoryRooms = new Map<string, RoomRecord>();
+let redisClientPromise: Promise<RedisClientType> | null = null;
 
 const SAVE_IF_VERSION_SCRIPT = `
 local current = redis.call("GET", KEYS[1])
@@ -118,7 +121,8 @@ redis.call("SET", KEYS[1], ARGV[2], "EX", ARGV[3])
 return 1
 `;
 
-const storeUsesRedis = Boolean(redisUrl && redisToken);
+const storeUsesNodeRedis = Boolean(redisConnectionUrl);
+const storeUsesRedisRest = !storeUsesNodeRedis && Boolean(redisRestUrl && redisRestToken);
 
 export async function hasRoom(roomCode: string): Promise<boolean> {
   return (await readRoomRecord(roomCode)) !== null;
@@ -132,13 +136,13 @@ export async function createRoom(roomCode: string): Promise<boolean> {
     expiresAt: Date.now() + roomTtlMs,
   };
 
-  if (storeUsesRedis) {
+  if (storeUsesNodeRedis || storeUsesRedisRest) {
     const result = await redisCommand<string | null>([
       "SET",
       roomKey(normalizedRoomCode),
       JSON.stringify(record),
       "EX",
-      roomTtlSeconds,
+      String(roomTtlSeconds),
       "NX",
     ]);
     return result === "OK";
@@ -580,7 +584,7 @@ function submitTurnToRoom(
         const result = runActionPhase(plusPlayerInClone, plusAction as any, clone);
         if (plusAction) {
           actionDetails.push({
-            actionLabel: plusAction.type === "SWAP_TILE" ? "타일 교체" : "장애물 설치",
+            actionLabel: plusAction.type === "SWAP_TILE" ? "타일 위치 교환" : "장애물 설치",
             bus: BusType.PLUS,
             applied: result.applied,
             reason: result.reason,
@@ -602,7 +606,7 @@ function submitTurnToRoom(
         const result = runActionPhase(minusPlayerInClone, minusAction as any, clone);
         if (minusAction) {
           actionDetails.push({
-            actionLabel: minusAction.type === "SWAP_TILE" ? "타일 교체" : "장애물 설치",
+            actionLabel: minusAction.type === "SWAP_TILE" ? "타일 위치 교환" : "장애물 설치",
             bus: BusType.MINUS,
             applied: result.applied,
             reason: result.reason,
@@ -718,7 +722,7 @@ async function mutateRoom<T>(
 async function readRoomRecord(roomCode: string): Promise<RoomRecord | null> {
   const normalizedRoomCode = normalizeRoomCode(roomCode);
 
-  if (storeUsesRedis) {
+  if (storeUsesNodeRedis || storeUsesRedisRest) {
     const raw = await redisCommand<string | null>(["GET", roomKey(normalizedRoomCode)]);
     return raw ? (JSON.parse(raw) as RoomRecord) : null;
   }
@@ -739,7 +743,7 @@ async function saveRoomRecord(
     expiresAt: Date.now() + roomTtlMs,
   };
 
-  if (storeUsesRedis) {
+  if (storeUsesNodeRedis || storeUsesRedisRest) {
     const result = await redisCommand<number>([
       "EVAL",
       SAVE_IF_VERSION_SCRIPT,
@@ -766,14 +770,19 @@ async function saveRoomRecord(
 }
 
 async function redisCommand<T>(command: unknown[]): Promise<T> {
-  if (!redisUrl || !redisToken) {
+  if (storeUsesNodeRedis) {
+    const client = await getRedisClient();
+    return client.sendCommand(command.map(String)) as Promise<T>;
+  }
+
+  if (!redisRestUrl || !redisRestToken) {
     throw new Error("Redis 환경변수가 설정되지 않았습니다.");
   }
 
-  const response = await fetch(redisUrl, {
+  const response = await fetch(redisRestUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${redisToken}`,
+      Authorization: `Bearer ${redisRestToken}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(command),
@@ -790,6 +799,20 @@ async function redisCommand<T>(command: unknown[]): Promise<T> {
   }
 
   return payload?.result as T;
+}
+
+async function getRedisClient(): Promise<RedisClientType> {
+  if (!redisClientPromise) {
+    const client = createClient(
+      redisConnectionUrl ? { url: redisConnectionUrl } : undefined
+    );
+    client.on("error", (error) => {
+      console.error("Redis connection error", error);
+    });
+    redisClientPromise = client.connect() as Promise<RedisClientType>;
+  }
+
+  return redisClientPromise;
 }
 
 function getRoomTimingMeta(record: RoomRecord): RoomTimingMeta {
@@ -879,7 +902,7 @@ function deepClone<T>(obj: T): T {
 
 function actionLabel(action: TurnAction, currentHand: Card[]): string {
   if (action.type === "SWAP_TILE") {
-    return "타일 교체";
+    return "타일 위치 교환";
   }
   if (action.type === "PLACE_OBSTACLE") {
     return "장애물 설치";

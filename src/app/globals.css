@@ -615,6 +615,14 @@ h1, h2, h3, .brand-font {
   font-weight: 700;
 }
 
+.timer-save-state {
+  align-self: center;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .master-section {
   text-align: left;
 }
@@ -686,6 +694,7 @@ h1, h2, h3, .brand-font {
 .player-identity {
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .player-identity div {
@@ -693,6 +702,12 @@ h1, h2, h3, .brand-font {
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
+}
+
+.player-identity strong,
+.player-identity small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .player-identity small {
@@ -715,9 +730,27 @@ h1, h2, h3, .brand-font {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
   justify-content: center;
-  min-width: 180px;
+  min-width: 0;
+}
+
+.player-row.admin-player-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.player-row.admin-player-row .colour-picker {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  padding-left: 28px;
+}
+
+.player-row.admin-player-row .player-row-actions {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .colour-swatch {

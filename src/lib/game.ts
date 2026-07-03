@@ -169,7 +169,8 @@ export function step(
   card: Card,
   board: Tile[][],
   busType = BusType.PLUS,
-  otherWalls: Wall[] = []
+  otherWalls: Wall[] = [],
+  blockedCoords: Coord[] = []
 ): StepResult {
   if (card.kind === "LEFT" || card.kind === "RIGHT") {
     bus.facing = rotate(bus.facing, card.kind === "LEFT" ? "L" : "R");
@@ -189,13 +190,18 @@ export function step(
       break; // Stop before leaving the board
     }
 
-    // 2. Check wall/obstacle conflict
+    // 2. Check other bus occupancy
+    if (blockedCoords.some((coord) => coordsEqual(coord, next))) {
+      break; // Stop before entering another bus's tile
+    }
+
+    // 3. Check wall/obstacle conflict
     const segment = wallBetweenTiles(current, next);
     if (wallConflicts(segment, existing)) {
       break; // Stop before hitting the wall
     }
 
-    // 3. Move is valid, apply it
+    // 4. Move is valid, apply it
     path.push(next);
     current = next;
   }
@@ -334,7 +340,10 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
     const otherWalls = Object.entries(game.buses)
       .filter(([type]) => type !== action.bus)
       .flatMap(([, state]) => state.walls);
-    const result = step(bus, card, game.board, action.bus, otherWalls);
+    const blockedCoords = Object.entries(game.buses)
+      .filter(([type]) => type !== action.bus)
+      .map(([, state]) => state.pos);
+    const result = step(bus, card, game.board, action.bus, otherWalls, blockedCoords);
     if (result.applied && result.path) {
       result.scoreGained = scorePathTiles(result.path, action.bus, game);
       result.regions = [];
@@ -369,14 +378,22 @@ export function runActionPhase(
       if (!targetTile || !busTile) {
         result = { applied: false, reason: "invalid-target", regions: [] };
       } else if (action.type === "SWAP_TILE") {
-        // Swap the colours of the bus's tile and the target tile
+        // Swap tile positions. Tiles currently only carry colour data.
         const temp = busTile.colour;
         busTile.colour = targetTile.colour;
         targetTile.colour = temp;
         result = { applied: true, regions: [] };
       } else if (action.type === "PLACE_OBSTACLE") {
-        // Place obstacle (wall segment) on the border between the bus and the target tile
+        if (dx + dy !== 1) {
+          return { applied: false, reason: "target-not-adjacent", regions: [] };
+        }
+
         const segment = wallBetweenTiles(busPos, action.target);
+        const allWalls = Object.values(game.buses).flatMap((state) => state.walls);
+        if (wallConflicts(segment, allWalls)) {
+          return { applied: false, reason: "obstacle-conflict", regions: [] };
+        }
+
         bus.walls.push({
           from: segment.from,
           to: segment.to,
@@ -411,16 +428,11 @@ export function nextPlayer(game: GameState): Player {
   return game.players[playerIndex];
 }
 
-export function nextRound(game: GameState, rng: Rng = Math.random): void {
+export function nextRound(game: GameState): void {
   if (game.turnIndex !== 0) {
     throw new Error("Cannot start next round before all players have acted");
   }
   game.roundIndex += 1;
-  if (!isGameOver(game)) {
-    for (const player of game.players) {
-      player.hand = dealHand(rng);
-    }
-  }
 }
 
 export function isGameOver(game: GameState): boolean {
@@ -587,6 +599,10 @@ function normalizeCoord(coord: Coord): Coord {
 
 function coordKey(coord: Coord): string {
   return `${coord.x},${coord.y}`;
+}
+
+function coordsEqual(a: Coord, b: Coord): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 function compareCoords(a: Coord, b: Coord): number {
