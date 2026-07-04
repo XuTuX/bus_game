@@ -2,7 +2,7 @@
 
 이 문서는 `Bus Route` 앱을 Vercel에 배포하고 Redis를 연결한 과정을 정리한 운영 문서입니다.
 
-비밀값은 문서에 적지 않습니다. `REDIS_URL` 같은 값은 Vercel 환경변수와 로컬 `.env.*.local` 파일에만 둡니다.
+비밀값은 문서에 적지 않습니다. Redis REST URL과 token 값은 Vercel 환경변수와 로컬 `.env.*.local` 파일에만 둡니다.
 
 ## 1. 현재 배포 상태
 
@@ -18,13 +18,12 @@ Vercel 프로젝트:
 xutuxs-projects/bus-game
 ```
 
-현재 앱은 방 상태를 다음 우선순위로 저장합니다.
+현재 앱은 방 상태를 Redis REST에만 저장합니다.
 
-1. `REDIS_URL`이 있으면 `redis` 패키지의 `createClient()`로 Redis 사용
-2. `UPSTASH_REDIS_REST_URL`과 `UPSTASH_REDIS_REST_TOKEN`이 있으면 Upstash REST 사용
-3. Redis 환경변수가 없으면 로컬 메모리 저장소 사용
+1. `UPSTASH_REDIS_REST_URL`과 `UPSTASH_REDIS_REST_TOKEN` 사용
+2. 또는 같은 REST 값의 alias로 `KV_REST_API_URL`과 `KV_REST_API_TOKEN` 사용
 
-Vercel 운영 환경에서는 `REDIS_URL`을 사용합니다.
+Redis REST 환경변수가 없으면 앱은 방 상태를 저장할 수 없습니다.
 
 ## 2. 왜 Redis가 필요한가
 
@@ -54,23 +53,11 @@ Redis에 저장하는 주요 데이터:
 - 타이머 설정
 - 현재 단계 마감 시간
 
-## 3. 설치한 패키지
+## 3. Redis 연결 방식
 
-Redis SDK를 설치했습니다.
+별도 Redis SDK를 설치하지 않습니다.
 
-```bash
-npm install redis
-```
-
-`package.json`에는 다음 dependency가 추가됩니다.
-
-```json
-{
-  "dependencies": {
-    "redis": "^6.1.0"
-  }
-}
-```
+Next.js 서버 코드에서 `fetch()`로 Redis REST API를 호출합니다.
 
 ## 4. Vercel 프로젝트 연결
 
@@ -116,10 +103,11 @@ npx vercel env pull .env.production.local --environment=production
 
 ## 6. 필요한 환경변수
 
-운영에서 가장 중요한 값은 `REDIS_URL`입니다.
+운영에서 가장 중요한 값은 Redis REST URL과 token입니다.
 
 ```bash
-REDIS_URL=...
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 선택 환경변수:
@@ -134,19 +122,13 @@ ACTION_PHASE_SECONDS=120
 
 | 환경변수 | 기본값 | 의미 |
 | --- | ---: | --- |
-| `REDIS_URL` | 없음 | Redis 접속 URL |
+| `UPSTASH_REDIS_REST_URL` | 없음 | Redis REST API URL |
+| `UPSTASH_REDIS_REST_TOKEN` | 없음 | Redis REST API token |
 | `ROOM_TTL_SECONDS` | 43200 | 방 데이터 유지 시간. 기본 12시간 |
 | `MOVE_PHASE_SECONDS` | 180 | 이동 단계 기본 시간. 기본 3분 |
 | `ACTION_PHASE_SECONDS` | 120 | 행동 단계 기본 시간. 기본 2분 |
 
-Upstash REST 방식도 fallback으로 지원합니다.
-
-```bash
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
-```
-
-Vercel KV 호환 이름도 fallback으로 지원합니다.
+Vercel KV 호환 이름도 Redis REST alias로 지원합니다.
 
 ```bash
 KV_REST_API_URL=...
@@ -161,11 +143,12 @@ CLI로 환경변수 목록을 확인할 수 있습니다.
 npx vercel env ls
 ```
 
-정상이라면 다음처럼 `REDIS_URL`이 보여야 합니다.
+정상이라면 다음처럼 Redis REST 환경변수가 보여야 합니다.
 
 ```text
-name       value       environments
-REDIS_URL  Encrypted   Preview, Production
+name                      value       environments
+UPSTASH_REDIS_REST_URL    Encrypted   Preview, Production
+UPSTASH_REDIS_REST_TOKEN  Encrypted   Preview, Production
 ```
 
 값은 암호화되어 표시됩니다. 실제 URL을 터미널에 출력하지 않습니다.
@@ -181,17 +164,11 @@ src/server/gameStore.ts
 핵심 흐름:
 
 ```ts
-import { createClient } from "redis";
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
 ```
 
-`REDIS_URL`이 있으면 Redis client를 생성합니다.
-
-```ts
-const client = createClient({ url: process.env.REDIS_URL });
-await client.connect();
-```
-
-실제 구현에서는 매 요청마다 새 연결을 만들지 않도록 client promise를 재사용합니다.
+REST URL과 token이 있으면 `fetch()`로 Redis 명령을 보냅니다.
 
 방 상태는 Redis key 하나에 JSON으로 저장합니다.
 
@@ -293,9 +270,9 @@ npx vercel env ls
 npx vercel --prod --yes
 ```
 
-### `.env.development.local`에 `REDIS_URL`이 없는 경우
+### `.env.development.local`에 Redis REST 환경변수가 없는 경우
 
-`REDIS_URL`이 `Preview, Production`에만 있고 `Development`에는 없을 수 있습니다.
+Redis REST 환경변수가 `Preview, Production`에만 있고 `Development`에는 없을 수 있습니다.
 
 프로덕션 환경변수를 로컬로 확인하려면 다음을 사용합니다.
 
@@ -303,13 +280,11 @@ npx vercel --prod --yes
 npx vercel env pull .env.production.local --environment=production
 ```
 
-### 로컬에서는 Redis가 안 쓰이는 경우
+### 로컬에서 Redis REST 환경변수가 없는 경우
 
-로컬 `.env.local`이나 `.env.development.local`에 `REDIS_URL`이 없으면 앱은 메모리 저장소를 사용합니다.
+로컬 `.env.local`이나 `.env.development.local`에 Redis REST 환경변수가 없으면 방 생성과 상태 저장 요청이 실패합니다.
 
-이 상태에서는 Next dev 서버가 재시작되면 방 데이터가 사라질 수 있습니다.
-
-운영 배포에서는 Vercel의 `REDIS_URL`이 있으므로 Redis를 사용합니다.
+로컬에서도 Vercel에서 받은 `UPSTASH_REDIS_REST_URL`과 `UPSTASH_REDIS_REST_TOKEN` 값을 설정해야 합니다.
 
 ## 13. 운영 체크리스트
 

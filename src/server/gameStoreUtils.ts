@@ -1,24 +1,8 @@
 import {
   COLOURS,
-  createGame,
   type GameState,
 } from "@/lib/game";
-import { getDefaultTimerSettings } from "./gameStoreTimers";
-import { type RoomState, type TurnControllers } from "./gameStoreTypes";
-
-export function createEmptyRoom(): RoomState {
-  return {
-    game: createGame(Math.random, []),
-    participants: [],
-    logs: [],
-    status: "LOBBY",
-    logIdCounter: 0,
-    playerIdCounter: 0,
-    pendingMoves: {},
-    pendingActions: {},
-    timerSettings: getDefaultTimerSettings(),
-  };
-}
+import { type TurnControllers } from "./gameStoreTypes";
 
 export function getTurnControllers(game: GameState): TurnControllers {
   // 현재 턴 색상은 PLUS, 반대편 색상은 MINUS 버스를 조작합니다.

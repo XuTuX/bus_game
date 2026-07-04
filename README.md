@@ -42,8 +42,9 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 자세한 Vercel/Redis 연결 절차와 운영 체크리스트는 [VERCEL_REDIS_SETUP.md](./VERCEL_REDIS_SETUP.md)에 정리되어 있습니다.
 
-This app stores live room state in Redis when Redis environment variables are
-present. Without them, it falls back to local memory for development.
+This app stores live room state in Redis through the Redis REST API. Redis REST
+environment variables are required in every environment, including local
+development.
 
 Connect a Vercel Redis store, then pull the environment variables locally:
 
@@ -52,20 +53,14 @@ npx vercel link
 npx vercel env pull .env.development.local
 ```
 
-The app uses `redis` with `REDIS_URL` first:
-
-```bash
-REDIS_URL=...
-ROOM_TTL_SECONDS=43200
-MOVE_PHASE_SECONDS=180
-ACTION_PHASE_SECONDS=120
-```
-
-Upstash REST-compatible variables are also supported as a fallback:
+The app uses Upstash REST-compatible Redis variables:
 
 ```bash
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
+ROOM_TTL_SECONDS=43200
+MOVE_PHASE_SECONDS=180
+ACTION_PHASE_SECONDS=120
 ```
 
 - `ROOM_TTL_SECONDS`: how long a room is kept after the last saved state.
@@ -75,7 +70,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 - `ACTION_PHASE_SECONDS`: countdown shown during the action phase.
   The default is 2 minutes.
 
-Vercel KV-compatible names are also supported:
+Vercel KV-compatible REST variable names are also accepted:
 
 ```bash
 KV_REST_API_URL=...

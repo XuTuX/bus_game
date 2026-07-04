@@ -9,22 +9,19 @@ import {
   isGameOver,
 } from "@/lib/game";
 import {
+  type RoomRecord,
   type LobbyParticipant,
   type RoomState,
   type RoomTimerSettings,
 } from "./gameStoreTypes";
 import {
   clearPhaseTimer,
+  getDefaultTimerSettings,
   getRoomTimerSettings,
   sanitizeDurationSeconds,
   startPhaseTimer,
 } from "./gameStoreTimers";
-import {
-  createRoomRecord,
-  mutateRoomRecord,
-  readRoomRecord,
-} from "./gameStoreStorage";
-import { createEmptyRoom } from "./gameStoreUtils";
+import { deepClone } from "./gameStoreUtils";
 import { buildPrivateState, buildPublicState } from "./gameStoreStateViews";
 import { submitTurnToRoom } from "./gameStoreTurnFlow";
 export type {
@@ -36,13 +33,52 @@ export type {
   RoomTimingMeta,
 } from "./gameStoreTypes";
 
+const DEFAULT_ROOM_TTL_SECONDS = 12 * 60 * 60;
+const SAVE_RETRY_LIMIT = 5;
+
+const roomTtlSeconds = getPositiveEnvNumber("ROOM_TTL_SECONDS", DEFAULT_ROOM_TTL_SECONDS);
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+
+// Redis에 문자열로 보내는 Lua 스크립트입니다. redis.call은 Redis 서버 안에서 실행됩니다.
+const REDIS_SAVE_IF_VERSION_SCRIPT = `
+local current = redis.call("GET", KEYS[1])
+if not current then
+  if ARGV[1] ~= "-1" then
+    return 0
+  end
+else
+  local decoded = cjson.decode(current)
+  if tostring(decoded.version) ~= ARGV[1] then
+    return 0
+  end
+end
+redis.call("SET", KEYS[1], ARGV[2], "EX", ARGV[3])
+return 1
+`;
+
 // Next API 라우트에서 호출하는 방 단위 공개 API입니다.
 export async function hasRoom(roomCode: string): Promise<boolean> {
   return (await readRoomRecord(roomCode)) !== null;
 }
 
 export async function createRoom(roomCode: string): Promise<boolean> {
-  return createRoomRecord(roomCode, createEmptyRoom());
+  const normalizedRoomCode = normalizeRoomCode(roomCode);
+  const record: RoomRecord = {
+    room: createEmptyRoom(),
+    version: 0,
+    expiresAt: nextRoomExpiresAt(),
+  };
+
+  const result = await redisCommand<string | null>([
+    "SET",
+    roomKey(normalizedRoomCode),
+    JSON.stringify(record),
+    "EX",
+    String(roomTtlSeconds),
+    "NX",
+  ]);
+  return result === "OK";
 }
 
 export async function adminAddParticipant(
@@ -220,11 +256,49 @@ function addLobbyParticipant(room: RoomState, name: string): LobbyParticipant {
   return participant;
 }
 
+function createEmptyRoom(): RoomState {
+  return {
+    game: createGame(Math.random, []),
+    participants: [],
+    logs: [],
+    status: "LOBBY",
+    logIdCounter: 0,
+    playerIdCounter: 0,
+    pendingMoves: {},
+    pendingActions: {},
+    timerSettings: getDefaultTimerSettings(),
+  };
+}
+
 async function mutateRoom<T>(
   roomCode: string,
   mutate: (room: RoomState) => T
 ): Promise<T> {
-  return mutateRoomRecord(roomCode, createEmptyRoom, mutate);
+  const normalizedRoomCode = normalizeRoomCode(roomCode);
+  let lastResult: T | undefined;
+
+  for (let attempt = 0; attempt < SAVE_RETRY_LIMIT; attempt++) {
+    const existingRecord = await readRoomRecord(normalizedRoomCode);
+    const expectedVersion = existingRecord?.version ?? -1;
+    const room = existingRecord ? deepClone(existingRecord.room) : createEmptyRoom();
+    lastResult = mutate(room);
+
+    const saved = await saveRoomRecord(
+      normalizedRoomCode,
+      {
+        room,
+        version: expectedVersion + 1,
+        expiresAt: nextRoomExpiresAt(),
+      },
+      expectedVersion
+    );
+
+    if (saved) {
+      return lastResult;
+    }
+  }
+
+  throw new Error("동시 요청이 많아 저장에 실패했습니다. 다시 시도해주세요.");
 }
 
 function nextAvailableColour(participants: LobbyParticipant[]): Colour {
@@ -242,4 +316,77 @@ function nextAvailableColour(participants: LobbyParticipant[]): Colour {
     COLOURS.find((colour) => (counts.get(colour) ?? 0) < MAX_PLAYERS_PER_COLOUR) ??
     COLOURS[0]
   );
+}
+
+async function readRoomRecord(roomCode: string): Promise<RoomRecord | null> {
+  const normalizedRoomCode = normalizeRoomCode(roomCode);
+  const raw = await redisCommand<string | null>(["GET", roomKey(normalizedRoomCode)]);
+  return raw ? (JSON.parse(raw) as RoomRecord) : null;
+}
+
+async function saveRoomRecord(
+  roomCode: string,
+  record: RoomRecord,
+  expectedVersion: number
+): Promise<boolean> {
+  const normalizedRoomCode = normalizeRoomCode(roomCode);
+  const recordToSave: RoomRecord = {
+    ...record,
+    expiresAt: nextRoomExpiresAt(),
+  };
+
+  const result = await redisCommand<number>([
+    "EVAL",
+    REDIS_SAVE_IF_VERSION_SCRIPT,
+    1,
+    roomKey(normalizedRoomCode),
+    String(expectedVersion),
+    JSON.stringify(recordToSave),
+    String(roomTtlSeconds),
+  ]);
+  return result === 1;
+}
+
+async function redisCommand<T>(command: unknown[]): Promise<T> {
+  if (!redisRestUrl || !redisRestToken) {
+    throw new Error("Redis REST 환경변수가 설정되지 않았습니다.");
+  }
+
+  const response = await fetch(redisRestUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${redisRestToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(command),
+    cache: "no-store",
+  });
+
+  const payload = await response.json().catch(() => null) as {
+    result?: T;
+    error?: string;
+  } | null;
+
+  if (!response.ok || payload?.error) {
+    throw new Error(payload?.error ?? "Redis 요청에 실패했습니다.");
+  }
+
+  return payload?.result as T;
+}
+
+function nextRoomExpiresAt() {
+  return Date.now() + roomTtlSeconds * 1000;
+}
+
+function normalizeRoomCode(roomCode: string) {
+  return roomCode.trim().toUpperCase();
+}
+
+function roomKey(roomCode: string) {
+  return `room:${roomCode}`;
+}
+
+function getPositiveEnvNumber(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
