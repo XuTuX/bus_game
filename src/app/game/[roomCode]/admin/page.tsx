@@ -122,7 +122,7 @@ export default function AdminPage({
   const { status, game, participants, logs, activePlayerNames } = state;
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
-    action: "start_game" | "start" | "reveal" | "next"
+    action: "start_game" | "start"
   ) => {
     if (busyAction) return;
 

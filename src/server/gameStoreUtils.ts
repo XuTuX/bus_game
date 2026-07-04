@@ -1,0 +1,46 @@
+import {
+  COLOURS,
+  createGame,
+  type GameState,
+} from "@/lib/game";
+import { getDefaultTimerSettings } from "./gameStoreTimers";
+import { type RoomState, type TurnControllers } from "./gameStoreTypes";
+
+export function createEmptyRoom(): RoomState {
+  return {
+    game: createGame(Math.random, []),
+    participants: [],
+    logs: [],
+    status: "LOBBY",
+    logIdCounter: 0,
+    playerIdCounter: 0,
+    pendingMoves: {},
+    pendingActions: {},
+    timerSettings: getDefaultTimerSettings(),
+  };
+}
+
+export function getTurnControllers(game: GameState): TurnControllers {
+  // 현재 턴 색상은 PLUS, 반대편 색상은 MINUS 버스를 조작합니다.
+  const plusTeamColor = COLOURS[game.turnIndex];
+  const minusTeamColor = COLOURS[COLOURS.length - 1 - game.turnIndex];
+  const plusTeamPlayers = game.players.filter((p) => p.team === plusTeamColor);
+  const minusTeamPlayers = game.players.filter((p) => p.team === minusTeamColor);
+
+  return {
+    plusPlayer: plusTeamPlayers[0],
+    minusPlayer: minusTeamPlayers[1] || minusTeamPlayers[0],
+  };
+}
+
+export function findClonePlayer(game: GameState, playerId: string): GameState["players"][number] {
+  const player = game.players.find((p) => p.id === playerId);
+  if (!player) {
+    throw new Error("플레이어를 찾을 수 없습니다.");
+  }
+  return player;
+}
+
+export function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}

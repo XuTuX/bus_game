@@ -148,7 +148,7 @@ export async function submitAction(
 
 export async function adminAction(
   roomCode: string,
-  action: "start_game" | "start" | "reveal" | "next"
+  action: "start_game" | "start"
 ) {
   const res = await fetch(`/api/game/${roomCode}/admin`, {
     method: "POST",
