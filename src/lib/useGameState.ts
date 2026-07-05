@@ -4,6 +4,10 @@ import {
   type RoomState,
   type RoomTimerSettings,
 } from "@/server/gameStore";
+import {
+  getResponseErrorMessage,
+  parseJsonResponse,
+} from "@/lib/apiClient";
 import { type Card, type Colour, type TurnAction, BusType } from "@/lib/game";
 
 export type TimingState = {
@@ -51,8 +55,10 @@ export function usePublicGame(roomCode: string) {
       try {
         const res = await fetch(`/api/game/${roomCode}/public`);
         if (res.ok) {
-          const json = await res.json();
-          setData({ ...json, receivedAt: Date.now() });
+          const json = await parseJsonResponse<PublicStateResult>(res);
+          if (json) {
+            setData({ ...json, receivedAt: Date.now() });
+          }
         }
       } catch (e) {
         // ignore network errors for polling
@@ -79,8 +85,10 @@ export function usePrivateGame(roomCode: string, playerId: string) {
       try {
         const res = await fetch(`/api/game/${roomCode}/player/${playerId}`);
         if (res.ok) {
-          const json = await res.json();
-          setData({ ...json, receivedAt: Date.now() });
+          const json = await parseJsonResponse<PrivateStateResult>(res);
+          if (json) {
+            setData({ ...json, receivedAt: Date.now() });
+          }
         }
       } catch (e) {
         // ignore network errors for polling
@@ -141,8 +149,9 @@ export async function submitAction(
   });
   
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to submit turn");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to submit turn")
+    );
   }
 }
 
@@ -157,8 +166,9 @@ export async function adminAction(
   });
   
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to perform admin action");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to perform admin action")
+    );
   }
 }
 
@@ -170,8 +180,9 @@ export async function adminAddPlayer(roomCode: string, name: string) {
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to add player");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to add player")
+    );
   }
 }
 
@@ -183,8 +194,9 @@ export async function adminRemovePlayer(roomCode: string, playerId: string) {
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to remove player");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to remove player")
+    );
   }
 }
 
@@ -200,8 +212,9 @@ export async function adminSetPlayerColour(
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to set player colour");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to set player colour")
+    );
   }
 }
 
@@ -216,7 +229,8 @@ export async function adminSetTimers(
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to set timers");
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to set timers")
+    );
   }
 }

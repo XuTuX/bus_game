@@ -8,6 +8,8 @@ import {
   createGame,
   isGameOver,
 } from "@/lib/game";
+import net from "node:net";
+import tls from "node:tls";
 import {
   type RoomRecord,
   type LobbyParticipant,
@@ -39,6 +41,7 @@ const SAVE_RETRY_LIMIT = 5;
 const roomTtlSeconds = getPositiveEnvNumber("ROOM_TTL_SECONDS", DEFAULT_ROOM_TTL_SECONDS);
 const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
 const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+const redisUrl = process.env.REDIS_URL;
 
 // Redis에 문자열로 보내는 Lua 스크립트입니다. redis.call은 Redis 서버 안에서 실행됩니다.
 const REDIS_SAVE_IF_VERSION_SCRIPT = `
@@ -348,14 +351,28 @@ async function saveRoomRecord(
 }
 
 async function redisCommand<T>(command: unknown[]): Promise<T> {
-  if (!redisRestUrl || !redisRestToken) {
-    throw new Error("Redis REST 환경변수가 설정되지 않았습니다.");
+  if (redisRestUrl && redisRestToken) {
+    return redisRestCommand<T>(redisRestUrl, redisRestToken, command);
   }
 
-  const response = await fetch(redisRestUrl, {
+  if (redisUrl) {
+    return redisUrlCommand<T>(redisUrl, command);
+  }
+
+  throw new Error(
+    "Redis 환경변수가 설정되지 않았습니다. UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN 또는 REDIS_URL이 필요합니다."
+  );
+}
+
+async function redisRestCommand<T>(
+  url: string,
+  token: string,
+  command: unknown[]
+): Promise<T> {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${redisRestToken}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(command),
@@ -372,6 +389,170 @@ async function redisCommand<T>(command: unknown[]): Promise<T> {
   }
 
   return payload?.result as T;
+}
+
+function redisUrlCommand<T>(urlValue: string, command: unknown[]): Promise<T> {
+  const url = new URL(urlValue);
+  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
+    throw new Error("REDIS_URL은 redis:// 또는 rediss:// 형식이어야 합니다.");
+  }
+
+  const useTls = url.protocol === "rediss:";
+  const port = Number(url.port || 6379);
+  const authCommand = getRedisAuthCommand(url);
+  const commands = authCommand ? [authCommand, command] : [command];
+
+  return new Promise((resolve, reject) => {
+    let responseBuffer = Buffer.alloc(0);
+    const responses: unknown[] = [];
+    let settled = false;
+
+    const socket = useTls
+      ? tls.connect({
+          host: url.hostname,
+          port,
+          servername: url.hostname,
+        })
+      : net.connect({
+          host: url.hostname,
+          port,
+        });
+
+    const finish = (error?: Error, result?: unknown) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.destroy();
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result as T);
+      }
+    };
+
+    const sendCommands = () => {
+      socket.write(commands.map(encodeRedisCommand).join(""));
+    };
+
+    socket.setTimeout(10_000, () => {
+      finish(new Error("Redis 연결 시간이 초과되었습니다."));
+    });
+    socket.once("error", (error) => finish(error));
+    socket.once(useTls ? "secureConnect" : "connect", sendCommands);
+    socket.on("data", (chunk) => {
+      responseBuffer = Buffer.concat([responseBuffer, chunk]);
+
+      try {
+        while (responses.length < commands.length) {
+          const parsed = parseRedisResponse(responseBuffer);
+          if (!parsed) {
+            return;
+          }
+
+          responses.push(parsed.value);
+          responseBuffer = responseBuffer.subarray(parsed.nextOffset);
+        }
+      } catch (error) {
+        finish(
+          error instanceof Error ? error : new Error("Redis 응답을 읽지 못했습니다.")
+        );
+        return;
+      }
+
+      finish(undefined, responses[responses.length - 1]);
+    });
+  });
+}
+
+function getRedisAuthCommand(url: URL): string[] | null {
+  const username = decodeURIComponent(url.username);
+  const password = decodeURIComponent(url.password);
+
+  if (username && password) {
+    return ["AUTH", username, password];
+  }
+  if (password) {
+    return ["AUTH", password];
+  }
+  return null;
+}
+
+function encodeRedisCommand(command: unknown[]): string {
+  return `*${command.length}\r\n${command
+    .map((argument) => {
+      const value = String(argument);
+      return `$${Buffer.byteLength(value)}\r\n${value}\r\n`;
+    })
+    .join("")}`;
+}
+
+type ParsedRedisResponse = {
+  value: unknown;
+  nextOffset: number;
+};
+
+function parseRedisResponse(buffer: Buffer, offset = 0): ParsedRedisResponse | null {
+  if (offset >= buffer.length) {
+    return null;
+  }
+
+  const prefix = String.fromCharCode(buffer[offset]);
+  const lineEnd = buffer.indexOf("\r\n", offset);
+  if (lineEnd === -1) {
+    return null;
+  }
+
+  const line = buffer.toString("utf8", offset + 1, lineEnd);
+  const valueStart = lineEnd + 2;
+
+  if (prefix === "+") {
+    return { value: line, nextOffset: valueStart };
+  }
+  if (prefix === "-") {
+    throw new Error(line);
+  }
+  if (prefix === ":") {
+    return { value: Number(line), nextOffset: valueStart };
+  }
+  if (prefix === "$") {
+    const length = Number(line);
+    if (length === -1) {
+      return { value: null, nextOffset: valueStart };
+    }
+
+    const valueEnd = valueStart + length;
+    const nextOffset = valueEnd + 2;
+    if (buffer.length < nextOffset) {
+      return null;
+    }
+
+    return {
+      value: buffer.toString("utf8", valueStart, valueEnd),
+      nextOffset,
+    };
+  }
+  if (prefix === "*") {
+    const length = Number(line);
+    if (length === -1) {
+      return { value: null, nextOffset: valueStart };
+    }
+
+    const values: unknown[] = [];
+    let nextOffset = valueStart;
+    for (let index = 0; index < length; index++) {
+      const parsed = parseRedisResponse(buffer, nextOffset);
+      if (!parsed) {
+        return null;
+      }
+      values.push(parsed.value);
+      nextOffset = parsed.nextOffset;
+    }
+
+    return { value: values, nextOffset };
+  }
+
+  throw new Error("지원하지 않는 Redis 응답 형식입니다.");
 }
 
 function nextRoomExpiresAt() {

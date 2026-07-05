@@ -8,6 +8,7 @@ import {
   adminStartTurn,
 } from "@/server/gameStore";
 import { Colour } from "@/lib/game";
+import { getErrorMessage } from "@/server/apiError";
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +56,7 @@ export async function POST(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
 }

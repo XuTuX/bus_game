@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submitTurn } from "@/server/gameStore";
 import { type TurnAction } from "@/lib/game";
+import { getErrorMessage } from "@/server/apiError";
 
 export async function POST(
   request: NextRequest,
@@ -25,7 +26,7 @@ export async function POST(
     await submitTurn(roomCode, playerId, actions || [], bus);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
 }

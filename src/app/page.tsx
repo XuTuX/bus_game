@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { requireJsonResponse } from "@/lib/apiClient";
 
 export default function Home() {
   const router = useRouter();
@@ -14,7 +15,10 @@ export default function Home() {
     setError("");
     try {
       const res = await fetch("/api/rooms", { method: "POST" });
-      const data = await res.json();
+      const data = await requireJsonResponse<{ roomCode?: string }>(
+        res,
+        "방 생성에 실패했습니다."
+      );
       if (data.roomCode) {
         router.push(`/game/${data.roomCode}/admin`);
       } else {
