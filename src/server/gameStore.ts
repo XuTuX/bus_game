@@ -39,8 +39,6 @@ const DEFAULT_ROOM_TTL_SECONDS = 12 * 60 * 60;
 const SAVE_RETRY_LIMIT = 5;
 
 const roomTtlSeconds = getPositiveEnvNumber("ROOM_TTL_SECONDS", DEFAULT_ROOM_TTL_SECONDS);
-const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
 const redisUrl = process.env.REDIS_URL;
 
 // Redis에 문자열로 보내는 Lua 스크립트입니다. redis.call은 Redis 서버 안에서 실행됩니다.
@@ -48,7 +46,7 @@ const REDIS_SAVE_IF_VERSION_SCRIPT = `
 local current = redis.call("GET", KEYS[1])
 if not current then
   if ARGV[1] ~= "-1" then
-    return 0
+    return 0  
   end
 else
   local decoded = cjson.decode(current)
@@ -351,9 +349,6 @@ async function saveRoomRecord(
 }
 
 async function redisCommand<T>(command: unknown[]): Promise<T> {
-  if (redisRestUrl && redisRestToken) {
-    return redisRestCommand<T>(redisRestUrl, redisRestToken, command);
-  }
 
   if (redisUrl) {
     return redisUrlCommand<T>(redisUrl, command);
@@ -409,14 +404,14 @@ function redisUrlCommand<T>(urlValue: string, command: unknown[]): Promise<T> {
 
     const socket = useTls
       ? tls.connect({
-          host: url.hostname,
-          port,
-          servername: url.hostname,
-        })
+        host: url.hostname,
+        port,
+        servername: url.hostname,
+      })
       : net.connect({
-          host: url.hostname,
-          port,
-        });
+        host: url.hostname,
+        port,
+      });
 
     const finish = (error?: Error, result?: unknown) => {
       if (settled) {
