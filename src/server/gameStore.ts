@@ -35,10 +35,9 @@ export type {
   RoomTimingMeta,
 } from "./gameStoreTypes";
 
-const DEFAULT_ROOM_TTL_SECONDS = 12 * 60 * 60;
+const roomTtlSeconds = 12 * 60 * 60;
 const SAVE_RETRY_LIMIT = 5;
 
-const roomTtlSeconds = getPositiveEnvNumber("ROOM_TTL_SECONDS", DEFAULT_ROOM_TTL_SECONDS);
 const redisUrl = process.env.REDIS_URL;
 
 // Redis에 문자열로 보내는 Lua 스크립트입니다. redis.call은 Redis 서버 안에서 실행됩니다.
@@ -560,9 +559,4 @@ function normalizeRoomCode(roomCode: string) {
 
 function roomKey(roomCode: string) {
   return `room:${roomCode}`;
-}
-
-function getPositiveEnvNumber(name: string, fallback: number) {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
