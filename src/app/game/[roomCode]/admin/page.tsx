@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, use, useEffect, useState } from "react";
 import Board from "@/components/Board";
+import PlayerRoomOrder from "@/components/PlayerRoomOrder";
 import RoomPageLinks from "@/components/RoomPageLinks";
 import ScoreBoard from "@/components/ScoreBoard";
 import ActionLog from "@/components/ActionLog";
@@ -370,59 +371,47 @@ export default function AdminPage({
             <h2 className="brand-font">참가자</h2>
             <span>{participants.length} / {MAX_PLAYERS}</span>
           </div>
-          <div className="players-list">
-            {participants.length === 0 ? (
-              <div className="empty-state">아직 입력된 참가자가 없습니다.</div>
-            ) : (
-              participants.map((participant, index) => (
-                <div className="player-row admin-player-row" key={participant.id}>
-                  <div className="player-identity">
-                    <span className="seat-number">{index + 1}</span>
-                    <span
-                      className="score-dot"
-                      style={{
-                        background: participant.colour
-                          ? TEAM_COLOUR_VARS[participant.colour]
-                          : "var(--text-muted)",
-                      }}
+          <PlayerRoomOrder
+            activePlayerNames={activePlayerNames}
+            emptyText="아직 입력된 참가자가 없습니다."
+            game={game}
+            participants={participants}
+            rowClassName="admin-player-row"
+            status={status}
+            teamLabels={TEAM_LABELS}
+            renderColourPicker={(participant) =>
+              status === "LOBBY" ? (
+                <div className="colour-picker" aria-label={`${participant.name} 색상 선택`}>
+                  {COLOURS.map((colour) => (
+                    <button
+                      key={colour}
+                      className={`colour-swatch ${
+                        participant.colour === colour ? "colour-swatch-active" : ""
+                      }`}
+                      style={{ background: TEAM_COLOUR_VARS[colour] }}
+                      title={TEAM_LABELS[colour]}
+                      aria-label={TEAM_LABELS[colour]}
+                      disabled={editingPlayers}
+                      onClick={() => handleSetColour(participant.id, colour)}
                     />
-                    <div>
-                      <strong>{participant.name}</strong>
-                      <small>{participant.colour ? TEAM_LABELS[participant.colour] : "색상 미배정"}</small>
-                    </div>
-                  </div>
-                  {status === "LOBBY" && (
-                    <div className="colour-picker" aria-label={`${participant.name} 색상 선택`}>
-                      {COLOURS.map((colour) => (
-                        <button
-                          key={colour}
-                          className={`colour-swatch ${
-                            participant.colour === colour ? "colour-swatch-active" : ""
-                          }`}
-                          style={{ background: TEAM_COLOUR_VARS[colour] }}
-                          title={TEAM_LABELS[colour]}
-                          aria-label={TEAM_LABELS[colour]}
-                          disabled={editingPlayers}
-                          onClick={() => handleSetColour(participant.id, colour)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {status === "LOBBY" && (
-                    <div className="player-row-actions">
-                      <button
-                        className="btn btn-ghost compact-btn danger-btn"
-                        disabled={editingPlayers}
-                        onClick={() => handleRemovePlayer(participant.id)}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))
-            )}
-          </div>
+              ) : null
+            }
+            renderActions={(participant) =>
+              status === "LOBBY" ? (
+                <div className="player-row-actions">
+                  <button
+                    className="btn btn-ghost compact-btn danger-btn"
+                    disabled={editingPlayers}
+                    onClick={() => handleRemovePlayer(participant.id)}
+                  >
+                    삭제
+                  </button>
+                </div>
+              ) : null
+            }
+          />
           {status !== "LOBBY" && (
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>
               <hr style={{ border: "none", borderTop: "1px solid var(--border-light)" }} />

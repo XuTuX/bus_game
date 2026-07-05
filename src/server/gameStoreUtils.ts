@@ -1,13 +1,14 @@
 import {
-  COLOURS,
+  getRoundColourOrder,
   type GameState,
 } from "@/lib/game";
 import { type TurnControllers } from "./gameStoreTypes";
 
 export function getTurnControllers(game: GameState): TurnControllers {
-  // 현재 턴 색상은 PLUS, 반대편 색상은 MINUS 버스를 조작합니다.
-  const plusTeamColor = COLOURS[game.turnIndex];
-  const minusTeamColor = COLOURS[COLOURS.length - 1 - game.turnIndex];
+  // 라운드마다 색상 순서를 한 칸씩 밀고, 현재 턴 색상은 PLUS, 반대편 색상은 MINUS 버스를 조작합니다.
+  const roundColourOrder = getRoundColourOrder(game.roundIndex);
+  const plusTeamColor = roundColourOrder[game.turnIndex];
+  const minusTeamColor = roundColourOrder[roundColourOrder.length - 1 - game.turnIndex];
   const plusTeamPlayers = game.players.filter((p) => p.team === plusTeamColor);
   const minusTeamPlayers = game.players.filter((p) => p.team === minusTeamColor);
 

@@ -109,6 +109,11 @@ export const COLOURS = [
   Colour.Blue,
 ] as const;
 
+export function getRoundColourOrder(roundIndex: number): Colour[] {
+  const offset = roundIndex % COLOURS.length;
+  return [...COLOURS.slice(offset), ...COLOURS.slice(0, offset)];
+}
+
 export const MAX_PLAYERS_PER_COLOUR = 2;
 export const MAX_PLAYERS = COLOURS.length * MAX_PLAYERS_PER_COLOUR;
 

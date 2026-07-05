@@ -1192,6 +1192,48 @@ h1, h2, h3, .brand-font {
   gap: 8px;
 }
 
+.player-room-order {
+  display: grid;
+  gap: 16px;
+}
+
+.player-room-section {
+  display: grid;
+  gap: 10px;
+}
+
+.player-room-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.player-room-title h3 {
+  font-size: 1rem;
+}
+
+.player-room-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: white;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 700;
+}
+
+.player-room-section-plus .player-room-badge {
+  background: var(--bus-plus);
+}
+
+.player-room-section-minus .player-room-badge {
+  background: var(--bus-minus);
+}
+
 .player-row {
   display: flex;
   align-items: center;

@@ -1,5 +1,6 @@
 import {
   BusType,
+  COLOURS,
   cardLabel,
   endOfRound,
   getConnectedComponentSize,
@@ -185,7 +186,7 @@ function submitActionPhase(
   scoreCurrentBusRegions(clone);
   addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1);
 
-  clone.turnIndex = (clone.turnIndex + 1) % 5;
+  clone.turnIndex = (clone.turnIndex + 1) % COLOURS.length;
 
   if (endOfRound(clone)) {
     nextRound(clone);

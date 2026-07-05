@@ -3,17 +3,10 @@
 import { use } from "react";
 import ActionLog from "@/components/ActionLog";
 import Board from "@/components/Board";
+import PlayerRoomOrder from "@/components/PlayerRoomOrder";
 import ScoreBoard from "@/components/ScoreBoard";
 import { usePhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
-import { MAX_PLAYERS, type Colour } from "@/lib/game";
-
-const TEAM_COLOUR_VARS: Record<Colour, string> = {
-  Red: "var(--team-red)",
-  Orange: "var(--team-orange)",
-  Yellow: "var(--team-yellow)",
-  Green: "var(--team-green)",
-  Blue: "var(--team-blue)",
-};
+import { MAX_PLAYERS } from "@/lib/game";
 
 const STATUS_LABELS = {
   LOBBY: "마스터 입력 대기",
@@ -62,48 +55,13 @@ export default function PublicBoardPage({
 
         <div className="status-panel">
           <h2>플레이어 순서</h2>
-          <div className="players-list">
-            {participants.length === 0 ? (
-              <div className="empty-state">마스터가 참가자를 입력합니다.</div>
-            ) : status === "LOBBY" ? (
-              participants.map((participant, index) => (
-                <div className="player-row" key={participant.id}>
-                  <div className="player-identity">
-                    <span className="seat-number">{index + 1}</span>
-                    <span
-                      className="score-dot"
-                      style={{
-                        background: participant.colour
-                          ? TEAM_COLOUR_VARS[participant.colour]
-                          : "var(--text-muted)",
-                      }}
-                    />
-                    <span>{participant.name}</span>
-                  </div>
-                  <span className="tiny-label">{participant.colour ?? "-"}</span>
-                </div>
-              ))
-            ) : (
-              game.players.map((player, index) => (
-                <div
-                  key={player.id}
-                  className={`player-row ${
-                    (player.name && activePlayerNames?.includes(player.name)) ? "player-row-active" : ""
-                  }`}
-                >
-                  <div className="player-identity">
-                    <span className="seat-number">{index + 1}</span>
-                    <span
-                      className="score-dot"
-                      style={{ background: TEAM_COLOUR_VARS[player.team] }}
-                    />
-                    <span>{player.name ?? player.id}</span>
-                  </div>
-                  <span className="tiny-label">{player.team}</span>
-                </div>
-              ))
-            )}
-          </div>
+          <PlayerRoomOrder
+            activePlayerNames={activePlayerNames}
+            emptyText="마스터가 참가자를 입력합니다."
+            game={game}
+            participants={participants}
+            status={status}
+          />
           <p className="muted-copy">정원 {participants.length} / {MAX_PLAYERS}</p>
         </div>
       </aside>
