@@ -180,10 +180,11 @@ export async function submitTurn(
   roomCode: string,
   playerId: string,
   actions: TurnAction[],
-  submittedBus?: BusType
+  submittedBus?: BusType,
+  mode?: "BUS" | "SUBWAY"
 ): Promise<void> {
   await mutateRoom(roomCode, (room) => {
-    submitTurnToRoom(room, playerId, actions, submittedBus);
+    submitTurnToRoom(room, playerId, actions, submittedBus, mode);
   });
 }
 
@@ -230,6 +231,9 @@ export async function adminStartTurn(roomCode: string): Promise<void> {
       throw new Error("현재 상태에서는 딜러룸 입력을 시작할 수 없습니다.");
     }
     room.status = "CHOOSING";
+    room.pendingMoves = {};
+    room.pendingSubwayMoves = {};
+    room.pendingActions = {};
     startPhaseTimer(room, getRoomTimerSettings(room).movePhaseSeconds);
   });
 }
@@ -278,6 +282,7 @@ function createEmptyRoom(): RoomState {
     logIdCounter: 0,
     playerIdCounter: 0,
     pendingMoves: {},
+    pendingSubwayMoves: {},
     pendingActions: {},
     timerSettings: getDefaultTimerSettings(),
   };

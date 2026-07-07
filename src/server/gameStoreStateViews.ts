@@ -5,7 +5,11 @@ import {
   type RoomState,
   type RoomTimingMeta,
 } from "./gameStoreTypes";
-import { deepClone, getTurnControllers } from "./gameStoreUtils";
+import {
+  deepClone,
+  getSubwayMoveTeams,
+  getTurnControllers,
+} from "./gameStoreUtils";
 
 export function buildPublicState(record: RoomRecord) {
   const { room } = record;
@@ -13,6 +17,11 @@ export function buildPublicState(record: RoomRecord) {
   safeGame.players.forEach((player) => {
     (player.hand as any) = Array(player.hand.length).fill({ kind: "HIDDEN" });
   });
+  const { busTeam } = getTurnControllers(room.game);
+  const subwayMoveTeams = getSubwayMoveTeams(room.game);
+  const pendingSubwayMoves = Object.fromEntries(
+    subwayMoveTeams.map((team) => [team, !!room.pendingSubwayMoves?.[team]])
+  );
 
   return {
     game: safeGame,
@@ -28,6 +37,9 @@ export function buildPublicState(record: RoomRecord) {
       BUS1: room.pendingActions.BUS1 !== undefined,
       BUS2: room.pendingActions.BUS2 !== undefined,
     },
+    busTeam,
+    subwayMoveTeams,
+    pendingSubwayMoves,
     ...getRoomTimingMeta(record),
   };
 }
@@ -77,6 +89,11 @@ function getActivePlayerNames(room: RoomState): string | null {
     if (bus1Player && !room.pendingMoves.BUS1) names.push(`${bus1Player.name}(BUS1)`);
     if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
       names.push(`${bus2Player.name}(BUS2)`);
+    }
+    for (const team of getSubwayMoveTeams(room.game)) {
+      if (!room.pendingSubwayMoves?.[team]) {
+        names.push(`${team}팀(지하철)`);
+      }
     }
   } else if (room.status === "ACTION_PHASE") {
     if (bus1Player && room.pendingActions.BUS1 === undefined) {

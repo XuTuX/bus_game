@@ -121,6 +121,8 @@ export default function AdminPage({
   }
 
   const { status, game, participants, logs, activePlayerNames } = state;
+  const subwayMoveTeams = state.subwayMoveTeams ?? [];
+  const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
   const canStartGame = participants.length > 0;
   const runAdminAction = async (
     action: "start_game" | "start"
@@ -211,6 +213,15 @@ export default function AdminPage({
                 style={{ background: "var(--bus2-color)", borderColor: "var(--bus2-color)" }}
               >
                 버스 2 딜러룸 열기
+              </Link>
+              <Link
+                href={`/dealer/${roomCode}/subway`}
+                className="btn btn-primary"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ background: "var(--text-primary)", borderColor: "var(--text-primary)" }}
+              >
+                지하철 조작 창 열기
               </Link>
             </>
           )}
@@ -349,6 +360,16 @@ export default function AdminPage({
               <p>
                 {activePlayerNames} 님이 제출하면 바로 공개판에 반영됩니다.
               </p>
+              {status === "CHOOSING" && subwayMoveTeams.length > 0 && (
+                <div className="status-metadata" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {subwayMoveTeams.map((team) => (
+                    <span key={team} className="team-pill">
+                      <span className={`score-dot score-dot-${team}`} />
+                      {team} 지하철: {pendingSubwayMoves[team] ? "완료" : "대기"}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

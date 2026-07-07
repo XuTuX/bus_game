@@ -393,13 +393,14 @@ export function dealHand(rng: Rng = Math.random): Card[] {
   return shuffle(cards, rng);
 }
 
-export function runMovePhase(player: Player, actions: MoveTurnAction[], game: GameState): StepResult[] {
+export function runMovePhase(
+  player: Player,
+  actions: MoveTurnAction[],
+  game: GameState,
+  options: { scoreSubwaysAtEnd?: boolean } = {}
+): StepResult[] {
   if (isGameOver(game)) {
     throw new Error("Game is already over");
-  }
-
-  if (actions.length === 0) {
-    throw new Error("반드시 카드를 사용해야 합니다. (패스 금지)");
   }
 
   // Validate moves
@@ -487,23 +488,27 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
   }
 
   // End of turn Subway scoring
-  if (actions.length > 0) {
-    const scoredColors = new Set<Colour>();
-    for (const [busType, subway] of Object.entries(game.subways)) {
-      for (const pos of subway.pos) {
-        const tile = game.board[pos.y]?.[pos.x];
-        if (tile && tile.colour) {
-          scoredColors.add(tile.colour);
-        }
-      }
-    }
-    for (const colour of scoredColors) {
-      game.teamScores[colour] += 1;
-      game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
-    }
+  if (options.scoreSubwaysAtEnd ?? true) {
+    scoreSubwayTiles(game);
   }
 
   return results;
+}
+
+export function scoreSubwayTiles(game: GameState): void {
+  const scoredColors = new Set<Colour>();
+  for (const subway of Object.values(game.subways)) {
+    for (const pos of subway.pos) {
+      const tile = game.board[pos.y]?.[pos.x];
+      if (tile && tile.colour) {
+        scoredColors.add(tile.colour);
+      }
+    }
+  }
+  for (const colour of scoredColors) {
+    game.teamScores[colour] += 1;
+    game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
+  }
 }
 
 export function runActionPhase(

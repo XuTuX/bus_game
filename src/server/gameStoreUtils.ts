@@ -1,4 +1,6 @@
 import {
+  COLOURS,
+  type Colour,
   getRoundColourOrder,
   type GameState,
 } from "@/lib/game";
@@ -12,9 +14,27 @@ export function getTurnControllers(game: GameState): TurnControllers {
   const bus1TeamPlayers = game.players.filter((p) => p.team === bus1TeamColor);
 
   return {
+    busTeam: bus1TeamColor,
     bus1Player: bus1TeamPlayers[0],
     bus2Player: bus1TeamPlayers[1] || bus1TeamPlayers[0],
   };
+}
+
+export function getSubwayMoveTeams(game: GameState): Colour[] {
+  const { busTeam } = getTurnControllers(game);
+  const teamsInGame = new Set(game.players.map((player) => player.team));
+  return getSubwayTeamOrder(game).filter(
+    (team) => team !== busTeam && teamsInGame.has(team)
+  );
+}
+
+export function getSubwayTeamOrder(game: GameState): Colour[] {
+  const roundColourOrder = getRoundColourOrder(game.roundIndex);
+  const startIndex = (game.turnIndex + 1) % COLOURS.length;
+  return [
+    ...roundColourOrder.slice(startIndex),
+    ...roundColourOrder.slice(0, startIndex),
+  ];
 }
 
 export function findClonePlayer(game: GameState, playerId: string): GameState["players"][number] {

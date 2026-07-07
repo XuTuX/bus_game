@@ -34,6 +34,9 @@ export type PublicStateResult = {
     BUS1: boolean;
     BUS2: boolean;
   };
+  busTeam?: Colour;
+  subwayMoveTeams?: Colour[];
+  pendingSubwayMoves?: Partial<Record<Colour, boolean>>;
 } & TimingState;
 
 export type PrivateStateResult = {
@@ -140,12 +143,13 @@ export async function submitAction(
   roomCode: string,
   playerId: string,
   actions: TurnAction[],
-  bus?: BusType
+  bus?: BusType,
+  mode?: "BUS" | "SUBWAY"
 ) {
   const res = await fetch(`/api/game/${roomCode}/action`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId, actions, bus }),
+    body: JSON.stringify({ playerId, actions, bus, mode }),
   });
   
   if (!res.ok) {

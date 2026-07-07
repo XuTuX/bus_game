@@ -8,6 +8,7 @@ import {
   nextRound,
   runActionPhase,
   runMovePhase,
+  scoreSubwayTiles,
   type Card,
   type GameState,
   type MoveTurnAction,
@@ -22,10 +23,12 @@ import {
   type ActionPhaseTurnAction,
   type LogEntry,
   type RoomState,
+  type SubwayMoveSubmission,
 } from "./gameStoreTypes";
 import {
   deepClone,
   findClonePlayer,
+  getSubwayMoveTeams,
   getTurnControllers,
 } from "./gameStoreUtils";
 
@@ -33,7 +36,8 @@ export function submitTurnToRoom(
   room: RoomState,
   playerId: string,
   actions: TurnAction[],
-  submittedBus?: BusType
+  submittedBus?: BusType,
+  mode: "BUS" | "SUBWAY" = "BUS"
 ) {
   // 제출은 이동 선택 단계와 행동 단계에서만 받습니다.
   if (room.status !== "CHOOSING" && room.status !== "ACTION_PHASE") {
@@ -43,6 +47,11 @@ export function submitTurnToRoom(
   const player = room.game.players.find((p) => p.id === playerId);
   if (!player) {
     throw new Error("플레이어를 찾을 수 없습니다.");
+  }
+
+  if (mode === "SUBWAY") {
+    submitSubwayMovePhase(room, player, actions as MoveTurnAction[], submittedBus);
+    return;
   }
 
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
@@ -102,7 +111,79 @@ function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusTyp
   if (!bus1Player) room.pendingMoves.BUS1 = [];
   if (!bus2Player) room.pendingMoves.BUS2 = [];
 
+  resolveMovePhaseIfReady(room);
+}
+
+function submitSubwayMovePhase(
+  room: RoomState,
+  player: GameState["players"][number],
+  actions: MoveTurnAction[],
+  submittedSubway?: BusType
+) {
+  room.pendingSubwayMoves ??= {};
+
+  if (room.status !== "CHOOSING") {
+    throw new Error("지하철은 이동 카드 선택 단계에서만 조작할 수 있습니다.");
+  }
+
+  const { busTeam } = getTurnControllers(room.game);
+  if (player.team === busTeam) {
+    throw new Error("버스를 조작하는 팀은 이번 차례 지하철을 조작할 수 없습니다.");
+  }
+
+  const subwayTeams = getSubwayMoveTeams(room.game);
+  if (!subwayTeams.includes(player.team)) {
+    throw new Error("이번 차례 지하철 조작 대상 팀이 아닙니다.");
+  }
+
+  if (room.pendingSubwayMoves[player.team]) {
+    throw new Error("이미 이 팀의 지하철 제출이 완료되었습니다.");
+  }
+
+  if (actions.length > 1) {
+    throw new Error("지하철 조작 카드는 팀당 최대 1장만 낼 수 있습니다.");
+  }
+
+  const action = actions[0];
+  const subway = submittedSubway ?? action?.bus ?? BusType.BUS1;
+  if (subway !== BusType.BUS1 && subway !== BusType.BUS2) {
+    throw new Error("유효하지 않은 지하철입니다.");
+  }
+
+  if (action && (action.cardIndex < 0 || action.cardIndex >= player.hand.length)) {
+    throw new Error(`Invalid card index ${action.cardIndex}`);
+  }
+
+  room.pendingSubwayMoves[player.team] = {
+    playerId: player.id,
+    team: player.team,
+    subway,
+    action: action
+      ? {
+          type: "MOVE",
+          bus: subway,
+          subway: true,
+          cardIndex: action.cardIndex,
+        }
+      : null,
+  };
+
+  resolveMovePhaseIfReady(room);
+}
+
+function resolveMovePhaseIfReady(room: RoomState) {
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
+  room.pendingSubwayMoves ??= {};
+
+  if (!bus1Player) room.pendingMoves.BUS1 = [];
+  if (!bus2Player) room.pendingMoves.BUS2 = [];
+
   if (!room.pendingMoves.BUS1 || !room.pendingMoves.BUS2) {
+    return;
+  }
+
+  const subwayTeams = getSubwayMoveTeams(room.game);
+  if (subwayTeams.some((team) => !room.pendingSubwayMoves[team])) {
     return;
   }
 
@@ -130,11 +211,21 @@ function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusTyp
     );
   }
 
+  for (const team of getSubwayMoveTeams(clone)) {
+    const submission = room.pendingSubwayMoves[team];
+    if (submission) {
+      appendSubwayLogAction(actionDetails, clone, submission);
+    }
+  }
+
+  scoreSubwayTiles(clone);
+
   addTurnLog(room, actionDetails, room.game.roundIndex + 1, room.game.turnIndex + 1);
 
   room.game = clone;
   room.status = "ACTION_PHASE";
   room.pendingMoves = {};
+  room.pendingSubwayMoves = {};
   startPhaseTimer(room, getRoomTimerSettings(room).actionPhaseSeconds);
 }
 
@@ -218,7 +309,7 @@ function appendMoveLogActions(
 ) {
   const player = findClonePlayer(game, playerId);
   const handCopy = [...player.hand];
-  const results = runMovePhase(player, moves, game);
+  const results = runMovePhase(player, moves, game, { scoreSubwaysAtEnd: false });
 
   moves.forEach((move, index) => {
     const result = results[index];
@@ -239,6 +330,38 @@ function appendMoveLogActions(
       scoreGained: 0,
     });
   }
+}
+
+function appendSubwayLogAction(
+  actionDetails: LogEntry["actions"],
+  game: GameState,
+  submission: SubwayMoveSubmission
+) {
+  const player = findClonePlayer(game, submission.playerId);
+  const subwayLabel = submission.subway === BusType.BUS1 ? "1호선" : "2호선";
+
+  if (!submission.action) {
+    actionDetails.push({
+      actionLabel: `지하철 ${subwayLabel} 패스`,
+      bus: submission.subway,
+      applied: true,
+      scoreGained: 0,
+    });
+    return;
+  }
+
+  const handCopy = [...player.hand];
+  const [result] = runMovePhase(player, [submission.action], game, {
+    scoreSubwaysAtEnd: false,
+  });
+
+  actionDetails.push({
+    actionLabel: `지하철 ${subwayLabel} ${actionLabel(submission.action, handCopy)}`,
+    bus: submission.subway,
+    applied: result.applied,
+    reason: result.reason,
+    scoreGained: result.scoreGained ?? 0,
+  });
 }
 
 function appendActionLogAction(

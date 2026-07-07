@@ -17,7 +17,6 @@ import {
   wallConflicts,
   type GameState,
   getRoundColourOrder,
-  stepSubway,
 } from "@/lib/game";
 import {
   submitAction,
@@ -63,7 +62,7 @@ const STATUS_TEXT = {
 // Convert chosen kinds into server-compatible relative indices
 function getMovesWithIndices(
   hand: { kind: CardKind }[],
-  selected: { kind: CardKind; bus: BusType; subway?: boolean }[]
+  selected: { kind: CardKind; bus: BusType }[]
 ): MoveTurnAction[] {
   const actions: MoveTurnAction[] = [];
   const remainingHand = [...hand];
@@ -73,7 +72,7 @@ function getMovesWithIndices(
     if (idx === -1) {
       throw new Error(`Card of type ${sel.kind} not found in hand.`);
     }
-    actions.push({ type: "MOVE", bus: sel.bus, subway: sel.subway, cardIndex: idx });
+    actions.push({ type: "MOVE", bus: sel.bus, cardIndex: idx });
     remainingHand.splice(idx, 1);
   }
   return actions;
@@ -114,9 +113,8 @@ export default function DealerRoom({
   // Movement selections
   const [chosenBus, setChosenBus] = useState<BusType>(BusType.BUS1);
   const [moveCategory, setMoveCategory] = useState<"FORWARD" | "ROTATE">("FORWARD");
-  type SelectedMove = { kind: CardKind; target: "BUS" | "SUBWAY" };
+  type SelectedMove = { kind: CardKind };
   const [selectedMoves, setSelectedMoves] = useState<SelectedMove[]>([]);
-  const [moveTarget, setMoveTarget] = useState<"BUS" | "SUBWAY">("BUS");
 
   // Action phase states
   const [selectedActionType, setSelectedActionType] = useState<"SWAP_TILE" | "PLACE_OBSTACLE" | null>(null);
@@ -235,7 +233,7 @@ export default function DealerRoom({
   const handleCardClick = (kind: CardKind) => {
     const remaining = getCardCount(kind);
     if (!canAct || status !== "CHOOSING" || submitting || remaining <= 0 || selectedMoves.length >= 3) return;
-    setSelectedMoves((prev) => [...prev, { kind, target: moveTarget }]);
+    setSelectedMoves((prev) => [...prev, { kind }]);
   };
 
   const activeBusType =
@@ -281,14 +279,6 @@ export default function DealerRoom({
 
       for (let i = 0; i < selectedMoves.length; i++) {
         const move = selectedMoves[i];
-        
-        if (move.target === "SUBWAY") {
-          const result = stepSubway(animClone.subways[activeBusType], { kind: move.kind } as any);
-          animClone.logs.push(...(result.logs || []));
-          setAnimatedGame({ ...animClone });
-          await delay(600);
-          continue;
-        }
 
         const kind = move.kind;
         const bus = animClone.buses[activeBusType];
@@ -324,7 +314,7 @@ export default function DealerRoom({
       }
 
       // 2. Submit the actual moves to the server
-      const selectedWithBuses = selectedMoves.map((m) => ({ kind: m.kind, bus: activeBusType, subway: m.target === "SUBWAY" }));
+      const selectedWithBuses = selectedMoves.map((m) => ({ kind: m.kind, bus: activeBusType }));
       const moveActions = getMovesWithIndices(hand, selectedWithBuses);
       await submitAction(roomCode, resolvedPlayerId, moveActions, activeBusType);
       setSubmittedPreviewGame(JSON.parse(JSON.stringify(animClone)) as GameState);
@@ -536,26 +526,6 @@ export default function DealerRoom({
                       </div>
                     )}
 
-                    {/* 1.5. Target Tab */}
-                    <div style={{ display: "flex", gap: "10px", marginBottom: "15px", justifyContent: "center" }}>
-                      <button
-                        className={`btn ${moveTarget === "BUS" ? "btn-primary" : "btn-ghost"}`}
-                        onClick={() => setMoveTarget("BUS")}
-                        style={{ padding: "8px 16px", borderRadius: "20px" }}
-                        disabled={submitting}
-                      >
-                        🚌 버스 조작
-                      </button>
-                      <button
-                        className={`btn ${moveTarget === "SUBWAY" ? "btn-primary" : "btn-ghost"}`}
-                        onClick={() => setMoveTarget("SUBWAY")}
-                        style={{ padding: "8px 16px", borderRadius: "20px" }}
-                        disabled={submitting}
-                      >
-                        🚇 지하철 조작
-                      </button>
-                    </div>
-
                     {/* 2. Move Category Tab */}
                     <div className="action-mode-tabs" style={{ marginBottom: 20 }}>
                       <button
@@ -635,16 +605,12 @@ export default function DealerRoom({
                             key={i}
                             className="selected-chip"
                             style={{
-                              background: m.target === "SUBWAY" 
-                                ? (activeBusType === BusType.BUS1 ? "#111" : "#333") 
-                                : (activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)"),
-                              boxShadow: m.target === "SUBWAY"
-                                ? "none"
-                                : (activeBusType === BusType.BUS1 ? "var(--shadow-glow-bus1)" : "var(--shadow-glow-bus2)"),
+                              background: activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
+                              boxShadow: activeBusType === BusType.BUS1 ? "var(--shadow-glow-bus1)" : "var(--shadow-glow-bus2)",
                             }}
                           >
                             <span>
-                              {m.target === "SUBWAY" ? "🚇" : "🚌"} {CARD_ICONS[m.kind]} {CARD_NAMES[m.kind]}
+                              🚌 {CARD_ICONS[m.kind]} {CARD_NAMES[m.kind]}
                             </span>
                             <button
                               className="chip-remove"

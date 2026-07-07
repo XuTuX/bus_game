@@ -38,6 +38,18 @@ export default async function DealerRoomPage({
               버스 2 딜러룸 열기
             </Link>
           </section>
+
+          <section className="home-section">
+            <h2 className="brand-font">지하철 조작 창</h2>
+            <p>버스 조작 팀을 제외한 팀들이 1호선/2호선 지하철 카드를 제출합니다.</p>
+            <Link
+              className="btn btn-primary"
+              href={`/dealer/${roomCode}/subway`}
+              style={{ background: "var(--text-primary)", borderColor: "var(--text-primary)" }}
+            >
+              지하철 조작 창 열기
+            </Link>
+          </section>
         </div>
 
         <div className="home-page-buttons" style={{ marginTop: 24 }}>

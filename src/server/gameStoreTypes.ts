@@ -9,6 +9,13 @@ import {
 
 export type ActionPhaseTurnAction = SwapTileTurnAction | PlaceObstacleTurnAction;
 
+export interface SubwayMoveSubmission {
+  playerId: string;
+  team: Colour;
+  subway: BusType;
+  action: MoveTurnAction | null;
+}
+
 export interface LobbyParticipant {
   id: string;
   name: string;
@@ -44,6 +51,7 @@ export interface RoomState {
     BUS1?: MoveTurnAction[];
     BUS2?: MoveTurnAction[];
   };
+  pendingSubwayMoves: Partial<Record<Colour, SubwayMoveSubmission>>;
   pendingActions: {
     BUS1?: ActionPhaseTurnAction | null;
     BUS2?: ActionPhaseTurnAction | null;
@@ -62,6 +70,7 @@ export interface RoomTimerSettings {
 export interface TurnControllers {
   bus1Player?: GameState["players"][number];
   bus2Player?: GameState["players"][number];
+  busTeam: Colour;
 }
 
 export interface RoomRecord {
