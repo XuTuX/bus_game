@@ -21,12 +21,12 @@ export function buildPublicState(record: RoomRecord) {
     status: room.status,
     activePlayerNames: getActivePlayerNames(room),
     pendingMoves: {
-      PLUS: !!room.pendingMoves.PLUS,
-      MINUS: !!room.pendingMoves.MINUS,
+      BUS1: !!room.pendingMoves.BUS1,
+      BUS2: !!room.pendingMoves.BUS2,
     },
     pendingActions: {
-      PLUS: room.pendingActions.PLUS !== undefined,
-      MINUS: room.pendingActions.MINUS !== undefined,
+      BUS1: room.pendingActions.BUS1 !== undefined,
+      BUS2: room.pendingActions.BUS2 !== undefined,
     },
     ...getRoomTimingMeta(record),
   };
@@ -49,15 +49,15 @@ export function buildPrivateState(record: RoomRecord, playerId: string) {
     };
   }
 
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
-  const isPlusController = stablePlayerId === plusPlayer?.id;
-  const isMinusController = stablePlayerId === minusPlayer?.id;
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
+  const isBus1Controller = stablePlayerId === bus1Player?.id;
+  const isBus2Controller = stablePlayerId === bus2Player?.id;
 
   return {
     hand: getVisiblePrivateHand(room, stablePlayerId),
     isMyTurn: isCurrentPlayerTurn(room, stablePlayerId),
-    isPlusController,
-    isMinusController,
+    isBus1Controller,
+    isBus2Controller,
     status: room.status,
     team: player?.team ?? participant?.colour,
     playerName: player?.name ?? participant?.name ?? player?.id,
@@ -70,24 +70,24 @@ function getActivePlayerNames(room: RoomState): string | null {
     return null;
   }
 
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
   const names: string[] = [];
 
   if (room.status === "CHOOSING") {
-    if (plusPlayer && !room.pendingMoves.PLUS) names.push(`${plusPlayer.name}(PLUS)`);
-    if (minusPlayer && !room.pendingMoves.MINUS && minusPlayer.id !== plusPlayer?.id) {
-      names.push(`${minusPlayer.name}(MINUS)`);
+    if (bus1Player && !room.pendingMoves.BUS1) names.push(`${bus1Player.name}(BUS1)`);
+    if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
+      names.push(`${bus2Player.name}(BUS2)`);
     }
   } else if (room.status === "ACTION_PHASE") {
-    if (plusPlayer && room.pendingActions.PLUS === undefined) {
-      names.push(`${plusPlayer.name}(PLUS)`);
+    if (bus1Player && room.pendingActions.BUS1 === undefined) {
+      names.push(`${bus1Player.name}(BUS1)`);
     }
     if (
-      minusPlayer &&
-      room.pendingActions.MINUS === undefined &&
-      minusPlayer.id !== plusPlayer?.id
+      bus2Player &&
+      room.pendingActions.BUS2 === undefined &&
+      bus2Player.id !== bus1Player?.id
     ) {
-      names.push(`${minusPlayer.name}(MINUS)`);
+      names.push(`${bus2Player.name}(BUS2)`);
     }
   }
 
@@ -95,21 +95,21 @@ function getActivePlayerNames(room: RoomState): string | null {
 }
 
 function isCurrentPlayerTurn(room: RoomState, playerId?: string) {
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
-  const isPlusController = playerId === plusPlayer?.id;
-  const isMinusController = playerId === minusPlayer?.id;
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
+  const isBus1Controller = playerId === bus1Player?.id;
+  const isBus2Controller = playerId === bus2Player?.id;
 
   if (room.status === "CHOOSING") {
-    const plusNeedsToSubmit = isPlusController && !room.pendingMoves.PLUS;
-    const minusNeedsToSubmit = isMinusController && !room.pendingMoves.MINUS;
+    const plusNeedsToSubmit = isBus1Controller && !room.pendingMoves.BUS1;
+    const minusNeedsToSubmit = isBus2Controller && !room.pendingMoves.BUS2;
     return plusNeedsToSubmit || minusNeedsToSubmit;
   }
 
   if (room.status === "ACTION_PHASE") {
     const plusNeedsToSubmit =
-      isPlusController && room.pendingActions.PLUS === undefined;
+      isBus1Controller && room.pendingActions.BUS1 === undefined;
     const minusNeedsToSubmit =
-      isMinusController && room.pendingActions.MINUS === undefined;
+      isBus2Controller && room.pendingActions.BUS2 === undefined;
     return plusNeedsToSubmit || minusNeedsToSubmit;
   }
 
@@ -133,20 +133,20 @@ function getVisiblePrivateHand(room: RoomState, playerId?: string): Card[] {
     return [];
   }
 
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
   if (
     room.status !== "CHOOSING" ||
-    plusPlayer?.id !== playerId ||
-    minusPlayer?.id !== playerId ||
-    !room.pendingMoves.PLUS ||
-    room.pendingMoves.MINUS
+    bus1Player?.id !== playerId ||
+    bus2Player?.id !== playerId ||
+    !room.pendingMoves.BUS1 ||
+    room.pendingMoves.BUS2
   ) {
     return player.hand;
   }
 
-  // 한 사람이 두 버스를 모두 조작할 때 PLUS 제출 후 남은 손패만 보여줍니다.
+  // 한 사람이 두 버스를 모두 조작할 때 BUS1 제출 후 남은 손패만 보여줍니다.
   const hand = [...player.hand];
-  for (const move of room.pendingMoves.PLUS) {
+  for (const move of room.pendingMoves.BUS1) {
     if (move.cardIndex >= 0 && move.cardIndex < hand.length) {
       hand.splice(move.cardIndex, 1);
     }

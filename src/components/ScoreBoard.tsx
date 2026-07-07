@@ -55,7 +55,7 @@ export default function ScoreBoard({
         <>
           <h2>🚌 버스 상태</h2>
           <div className="players-list">
-            {([BusType.PLUS, BusType.MINUS] as const).map((busType) => {
+            {([BusType.BUS1, BusType.BUS2] as const).map((busType) => {
               const bus = game.buses[busType];
               return (
                 <div className="score-item" key={busType} style={{ gap: 8 }}>
@@ -86,6 +86,43 @@ export default function ScoreBoard({
                 </div>
               );
             })}
+
+            {game.subway && (
+              <div className="score-item" style={{ gap: 8 }}>
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: "#555",
+                  }}
+                />
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
+                    지하철 (길이 {game.subway.pos.length})
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--text-secondary)",
+                      marginTop: 2,
+                    }}
+                  >
+                    머리: ({game.subway.pos[0]?.x}, {game.subway.pos[0]?.y}) · {FACING_LABELS[game.subway.facing]} 방향
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <h2>📝 최근 로그</h2>
+          <div className="players-list" style={{ maxHeight: "200px", overflowY: "auto", fontSize: "0.8rem", textAlign: "left" }}>
+            {game.logs && game.logs.slice(-10).map((log, index) => (
+              <div key={index} style={{ marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid var(--border-color)" }}>
+                {log}
+              </div>
+            ))}
           </div>
         </>
       )}

@@ -1,11 +1,11 @@
 import DealerRoom from "@/components/DealerRoom";
 import { BusType } from "@/lib/game";
 
-export default async function MinusDealerRoomPage({
+export default async function PlusDealerRoomPage({
   params,
 }: {
   params: Promise<{ roomCode: string }>;
 }) {
   const { roomCode } = await params;
-  return <DealerRoom roomCode={roomCode} roomBus={BusType.MINUS} />;
+  return <DealerRoom roomCode={roomCode} roomBus={BusType.BUS1} />;
 }

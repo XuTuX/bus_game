@@ -52,8 +52,8 @@
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
-  --shadow-glow-plus: 0 4px 16px var(--bus-plus-glow);
-  --shadow-glow-minus: 0 4px 16px var(--bus-minus-glow);
+  --shadow-glow-bus1: 0 4px 16px var(--bus-plus-glow);
+  --shadow-glow-bus2: 0 4px 16px var(--bus-minus-glow);
 }
 
 * {
@@ -229,13 +229,13 @@ h1, h2, h3, .brand-font {
   pointer-events: none;
 }
 
-.wall-plus {
+.wall-bus1 {
   stroke: var(--bus-plus);
   stroke-width: 4;
   stroke-linecap: round;
 }
 
-.wall-minus {
+.wall-bus2 {
   stroke: var(--bus-minus);
   stroke-width: 4;
   stroke-linecap: round;
@@ -265,18 +265,18 @@ h1, h2, h3, .brand-font {
   -webkit-user-select: none;
 }
 
-.bus-marker-PLUS {
+.bus-marker-BUS1 {
   --bus-marker-fill: var(--bus-plus);
   background: var(--bus-marker-fill);
   color: white;
-  box-shadow: var(--shadow-glow-plus);
+  box-shadow: var(--shadow-glow-bus1);
 }
 
-.bus-marker-MINUS {
+.bus-marker-BUS2 {
   --bus-marker-fill: var(--bus-minus);
   background: var(--bus-marker-fill);
   color: white;
-  box-shadow: var(--shadow-glow-minus);
+  box-shadow: var(--shadow-glow-bus2);
 }
 
 .bus-marker-label {
@@ -963,12 +963,12 @@ h1, h2, h3, .brand-font {
   box-shadow: 0 4px 12px rgba(253, 203, 110, 0.35);
 }
 
-.bus-choice-plus {
+.bus-choice-bus1 {
   background: rgba(0, 206, 201, 0.12);
   color: var(--bus-plus);
 }
 
-.bus-choice-minus {
+.bus-choice-bus2 {
   background: rgba(253, 121, 168, 0.12);
   color: var(--bus-minus);
 }
@@ -1044,13 +1044,13 @@ h1, h2, h3, .brand-font {
   transition: transform 0.2s;
   color: white;
 }
-.bus-btn-plus {
+.bus-btn-bus1 {
   background: var(--bus-plus);
-  box-shadow: var(--shadow-glow-plus);
+  box-shadow: var(--shadow-glow-bus1);
 }
-.bus-btn-minus {
+.bus-btn-bus2 {
   background: var(--bus-minus);
-  box-shadow: var(--shadow-glow-minus);
+  box-shadow: var(--shadow-glow-bus2);
 }
 .bus-btn:hover { transform: scale(1.05); }
 

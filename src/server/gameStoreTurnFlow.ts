@@ -45,42 +45,42 @@ export function submitTurnToRoom(
     throw new Error("플레이어를 찾을 수 없습니다.");
   }
 
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
 
-  const isPlusController = player.id === plusPlayer?.id;
-  const isMinusController = player.id === minusPlayer?.id;
+  const isBus1Controller = player.id === bus1Player?.id;
+  const isBus2Controller = player.id === bus2Player?.id;
 
-  if (!isPlusController && !isMinusController) {
+  if (!isBus1Controller && !isBus2Controller) {
     throw new Error("이번 차례의 조작 권한이 없습니다.");
   }
 
   let bus = submittedBus;
   if (!bus) {
-    if (isPlusController && !isMinusController) bus = BusType.PLUS;
-    else if (isMinusController && !isPlusController) bus = BusType.MINUS;
+    if (isBus1Controller && !isBus2Controller) bus = BusType.BUS1;
+    else if (isBus2Controller && !isBus1Controller) bus = BusType.BUS2;
     else {
       const firstAction = actions[0];
-      if (firstAction && "bus" in firstAction) {
+      if (firstAction && "bus" in firstAction && firstAction.bus) {
         bus = firstAction.bus;
       } else {
-        bus = BusType.PLUS;
+        bus = BusType.BUS1;
       }
     }
   }
 
-  if (bus === BusType.PLUS && !isPlusController) {
-    throw new Error("PLUS 버스 조작 권한이 없습니다.");
+  if (bus === BusType.BUS1 && !isBus1Controller) {
+    throw new Error("BUS1 버스 조작 권한이 없습니다.");
   }
-  if (bus === BusType.MINUS && !isMinusController) {
-    throw new Error("MINUS 버스 조작 권한이 없습니다.");
+  if (bus === BusType.BUS2 && !isBus2Controller) {
+    throw new Error("BUS2 버스 조작 권한이 없습니다.");
   }
   if (
     room.status === "CHOOSING" &&
-    bus === BusType.MINUS &&
-    plusPlayer?.id === minusPlayer?.id &&
-    !room.pendingMoves.PLUS
+    bus === BusType.BUS2 &&
+    bus1Player?.id === bus2Player?.id &&
+    !room.pendingMoves.BUS1
   ) {
-    throw new Error("한 명이 두 버스를 조작할 때는 PLUS 이동을 먼저 제출해야 합니다.");
+    throw new Error("한 명이 두 버스를 조작할 때는 BUS1 이동을 먼저 제출해야 합니다.");
   }
 
   if (room.status === "CHOOSING") {
@@ -91,41 +91,41 @@ export function submitTurnToRoom(
 }
 
 function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusType) {
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
 
-  if (bus === BusType.PLUS) {
-    room.pendingMoves.PLUS = actions;
+  if (bus === BusType.BUS1) {
+    room.pendingMoves.BUS1 = actions;
   } else {
-    room.pendingMoves.MINUS = actions;
+    room.pendingMoves.BUS2 = actions;
   }
 
-  if (!plusPlayer) room.pendingMoves.PLUS = [];
-  if (!minusPlayer) room.pendingMoves.MINUS = [];
+  if (!bus1Player) room.pendingMoves.BUS1 = [];
+  if (!bus2Player) room.pendingMoves.BUS2 = [];
 
-  if (!room.pendingMoves.PLUS || !room.pendingMoves.MINUS) {
+  if (!room.pendingMoves.BUS1 || !room.pendingMoves.BUS2) {
     return;
   }
 
   const clone = deepClone(room.game);
   const actionDetails: LogEntry["actions"] = [];
 
-  if (plusPlayer) {
+  if (bus1Player) {
     appendMoveLogActions(
       actionDetails,
       clone,
-      plusPlayer.id,
-      room.pendingMoves.PLUS,
-      BusType.PLUS
+      bus1Player.id,
+      room.pendingMoves.BUS1,
+      BusType.BUS1
     );
   }
 
-  if (minusPlayer) {
+  if (bus2Player) {
     appendMoveLogActions(
       actionDetails,
       clone,
-      minusPlayer.id,
-      room.pendingMoves.MINUS,
-      BusType.MINUS
+      bus2Player.id,
+      room.pendingMoves.BUS2,
+      BusType.BUS2
     );
   }
 
@@ -142,20 +142,20 @@ function submitActionPhase(
   action: ActionPhaseTurnAction | undefined,
   bus: BusType
 ) {
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
 
-  if (bus === BusType.PLUS) {
-    room.pendingActions.PLUS = action || null;
+  if (bus === BusType.BUS1) {
+    room.pendingActions.BUS1 = action || null;
   } else {
-    room.pendingActions.MINUS = action || null;
+    room.pendingActions.BUS2 = action || null;
   }
 
-  if (!plusPlayer) room.pendingActions.PLUS = null;
-  if (!minusPlayer) room.pendingActions.MINUS = null;
+  if (!bus1Player) room.pendingActions.BUS1 = null;
+  if (!bus2Player) room.pendingActions.BUS2 = null;
 
   if (
-    room.pendingActions.PLUS === undefined ||
-    room.pendingActions.MINUS === undefined
+    room.pendingActions.BUS1 === undefined ||
+    room.pendingActions.BUS2 === undefined
   ) {
     return;
   }
@@ -163,23 +163,23 @@ function submitActionPhase(
   const clone = deepClone(room.game);
   const actionDetails: LogEntry["actions"] = [];
 
-  if (plusPlayer) {
+  if (bus1Player) {
     appendActionLogAction(
       actionDetails,
       clone,
-      plusPlayer.id,
-      room.pendingActions.PLUS,
-      BusType.PLUS
+      bus1Player.id,
+      room.pendingActions.BUS1,
+      BusType.BUS1
     );
   }
 
-  if (minusPlayer) {
+  if (bus2Player) {
     appendActionLogAction(
       actionDetails,
       clone,
-      minusPlayer.id,
-      room.pendingActions.MINUS,
-      BusType.MINUS
+      bus2Player.id,
+      room.pendingActions.BUS2,
+      BusType.BUS2
     );
   }
 
@@ -265,10 +265,10 @@ function addTurnLog(
   round: number,
   turn: number
 ) {
-  const { plusPlayer, minusPlayer } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(room.game);
   room.logs.unshift({
     id: ++room.logIdCounter,
-    playerId: `${plusPlayer?.name ?? "PLUS"} & ${minusPlayer?.name ?? "MINUS"}`,
+    playerId: `${bus1Player?.name ?? "BUS1"} & ${bus2Player?.name ?? "BUS2"}`,
     team: "Blue",
     actions,
     round,
@@ -278,18 +278,18 @@ function addTurnLog(
 
 function scoreCurrentBusRegions(game: GameState) {
   const allWalls = [
-    ...game.buses.PLUS.walls,
-    ...game.buses.MINUS.walls,
+    ...game.buses.BUS1.walls,
+    ...game.buses.BUS2.walls,
   ];
 
-  const plusBus = game.buses.PLUS;
+  const plusBus = game.buses.BUS1;
   const plusSize = getConnectedComponentSize(plusBus.pos, game.board, allWalls);
   const plusColor = game.board[plusBus.pos.y]?.[plusBus.pos.x]?.colour;
   if (plusColor) {
     game.teamScores[plusColor] += plusSize;
   }
 
-  const minusBus = game.buses.MINUS;
+  const minusBus = game.buses.BUS2;
   const minusSize = getConnectedComponentSize(minusBus.pos, game.board, allWalls);
   const minusColor = game.board[minusBus.pos.y]?.[minusBus.pos.x]?.colour;
   if (minusColor) {

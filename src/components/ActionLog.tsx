@@ -93,13 +93,13 @@ export default function ActionLog({ logs }: { logs: LogEntry[] }) {
                     <span
                       style={{
                         color:
-                          action.bus === BusType.PLUS
+                          action.bus === BusType.BUS1
                             ? "var(--bus-plus)"
                             : "var(--bus-minus)",
                         fontWeight: "bold",
                       }}
                     >
-                      {action.bus === BusType.PLUS ? "＋" : "ー"}
+                      {action.bus === BusType.BUS1 ? "＋" : "ー"}
                     </span>
                     <span style={{ fontWeight: 600 }}>{action.actionLabel}</span>
                     <span>{action.applied ? "✓" : `✗ ${action.reason}`}</span>

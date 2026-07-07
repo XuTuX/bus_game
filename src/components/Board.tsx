@@ -46,7 +46,7 @@ export default function Board({
           row.map((tile, x) => (
             <div
               key={`${x}-${y}`}
-              className={`tile tile-${tile.colour}${
+              className={`tile tile-${tile.colour ?? 'gray'}${
                 scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
               }`}
             >
@@ -91,9 +91,9 @@ export default function Board({
               className={
                 wall.isObstacle
                   ? "wall-obstacle"
-                  : wall.busType === BusType.PLUS
-                  ? "wall-plus"
-                  : "wall-minus"
+                  : wall.busType === BusType.BUS1
+                  ? "wall-bus1"
+                  : "wall-bus2"
               }
             />
           );
@@ -109,7 +109,7 @@ export default function Board({
         const height = shouldShowFacing ? 26 : 28;
         const left = 12 + busState.pos.x * step + tileSize / 2 - width / 2;
         const top = 12 + busState.pos.y * step + tileSize / 2 - height / 2;
-        const offset = busType === BusType.PLUS ? -4 : 4;
+        const offset = busType === BusType.BUS1 ? -4 : 4;
         const rotation = FACING_ROTATION[busState.facing] ?? 0;
 
         return (
@@ -125,9 +125,40 @@ export default function Board({
             }}
           >
             <span className="bus-marker-label">
-              {busType === BusType.PLUS ? "+" : "-"}
+              {busType === BusType.BUS1 ? "1" : "2"}
             </span>
             {shouldShowFacing && <span className="bus-marker-head" />}
+          </div>
+        );
+      })}
+
+      {game.subway && game.subway.pos.map((pos, index) => {
+        const step = tileSize + tileGap;
+        const left = 12 + pos.x * step + tileSize / 2 - 14;
+        const top = 12 + pos.y * step + tileSize / 2 - 14;
+        return (
+          <div
+            key={`subway-${index}`}
+            className="subway-marker"
+            style={{
+              position: "absolute",
+              width: 28,
+              height: 28,
+              background: index === 0 ? "#333" : "#666",
+              borderRadius: index === 0 ? "8px" : "14px",
+              left,
+              top,
+              zIndex: 10,
+              boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontSize: "12px",
+              fontWeight: "bold"
+            }}
+          >
+            {index === 0 ? "S" : ""}
           </div>
         );
       })}

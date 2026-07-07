@@ -5,7 +5,7 @@ import {
 import { type TurnControllers } from "./gameStoreTypes";
 
 export function getTurnControllers(game: GameState): TurnControllers {
-  // 라운드마다 색상 순서를 한 칸씩 밀고, 현재 턴 색상은 PLUS, 반대편 색상은 MINUS 버스를 조작합니다.
+  // 라운드마다 색상 순서를 한 칸씩 밀고, 현재 턴 색상은 BUS1, 반대편 색상은 BUS2 버스를 조작합니다.
   const roundColourOrder = getRoundColourOrder(game.roundIndex);
   const plusTeamColor = roundColourOrder[game.turnIndex];
   const minusTeamColor = roundColourOrder[roundColourOrder.length - 1 - game.turnIndex];
@@ -13,8 +13,8 @@ export function getTurnControllers(game: GameState): TurnControllers {
   const minusTeamPlayers = game.players.filter((p) => p.team === minusTeamColor);
 
   return {
-    plusPlayer: plusTeamPlayers[0],
-    minusPlayer: minusTeamPlayers[1] || minusTeamPlayers[0],
+    bus1Player: plusTeamPlayers[0],
+    bus2Player: minusTeamPlayers[1] || minusTeamPlayers[0],
   };
 }
 

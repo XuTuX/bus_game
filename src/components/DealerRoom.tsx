@@ -100,7 +100,7 @@ export default function DealerRoom({
     const minusPlayer = minusTeamPlayers[1] || minusTeamPlayers[0];
 
     resolvedPlayerId =
-      roomBus === BusType.PLUS ? plusPlayer?.id || "" : minusPlayer?.id || "";
+      roomBus === BusType.BUS1 ? plusPlayer?.id || "" : minusPlayer?.id || "";
   }
 
   const privateState = usePrivateGame(roomCode, resolvedPlayerId);
@@ -111,7 +111,7 @@ export default function DealerRoom({
   const [submittedPreviewGame, setSubmittedPreviewGame] = useState<GameState | null>(null);
 
   // Movement selections
-  const [chosenBus, setChosenBus] = useState<BusType>(BusType.PLUS);
+  const [chosenBus, setChosenBus] = useState<BusType>(BusType.BUS1);
   const [moveCategory, setMoveCategory] = useState<"FORWARD" | "ROTATE">("FORWARD");
   const [selectedMoves, setSelectedMoves] = useState<CardKind[]>([]);
   
@@ -130,26 +130,26 @@ export default function DealerRoom({
   const isMinusActionSubmitted = publicState?.pendingActions?.MINUS ?? false;
   const selectedBus = roomBus ?? chosenBus;
   const isSelectedBusController =
-    selectedBus === BusType.PLUS ? isPlusController : isMinusController;
+    selectedBus === BusType.BUS1 ? isPlusController : isMinusController;
   const isSelectedMoveSubmitted =
-    selectedBus === BusType.PLUS ? isPlusSubmitted : isMinusSubmitted;
+    selectedBus === BusType.BUS1 ? isPlusSubmitted : isMinusSubmitted;
   const isSelectedActionSubmitted =
-    selectedBus === BusType.PLUS ? isPlusActionSubmitted : isMinusActionSubmitted;
+    selectedBus === BusType.BUS1 ? isPlusActionSubmitted : isMinusActionSubmitted;
 
   // Auto-lock chosenBus based on role authority
   useEffect(() => {
     if (roomBus) {
       setChosenBus(roomBus);
     } else if (isPlusController && !isMinusController) {
-      setChosenBus(BusType.PLUS);
+      setChosenBus(BusType.BUS1);
     } else if (isMinusController && !isPlusController) {
-      setChosenBus(BusType.MINUS);
+      setChosenBus(BusType.BUS2);
     } else if (isPlusController && isMinusController) {
       if (publicState?.status === "CHOOSING") {
-        setChosenBus(isPlusSubmitted && !isMinusSubmitted ? BusType.MINUS : BusType.PLUS);
+        setChosenBus(isPlusSubmitted && !isMinusSubmitted ? BusType.BUS2 : BusType.BUS1);
       } else if (publicState?.status === "ACTION_PHASE") {
         setChosenBus(
-          isPlusActionSubmitted && !isMinusActionSubmitted ? BusType.MINUS : BusType.PLUS
+          isPlusActionSubmitted && !isMinusActionSubmitted ? BusType.BUS2 : BusType.BUS1
         );
       }
     }
@@ -238,14 +238,14 @@ export default function DealerRoom({
   const activeBusType =
     roomBus ??
     (status === "ACTION_PHASE" && isPlusController && !isMinusController
-      ? BusType.PLUS
+      ? BusType.BUS1
       : status === "ACTION_PHASE" && isMinusController && !isPlusController
-        ? BusType.MINUS
+        ? BusType.BUS2
         : chosenBus);
   const displayGame =
     animatedGame || (status === "CHOOSING" ? submittedPreviewGame : null) || game;
   const activeBusPos = displayGame.buses[activeBusType].pos;
-  const roomBusLabel = selectedBus === BusType.PLUS ? "PLUS" : "MINUS";
+  const roomBusLabel = selectedBus === BusType.BUS1 ? "PLUS" : "MINUS";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
   // Generate 3x3 cells centered at the active bus position
@@ -478,12 +478,12 @@ export default function DealerRoom({
                         <div
                           className="tile-action-btn tile-action-btn-active"
                           style={{
-                            background: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
-                            borderColor: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
+                            background: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
+                            borderColor: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
                             color: "white",
                           }}
                         >
-                          {activeBusType === BusType.PLUS ? "＋ PLUS 버스 전용" : "ー MINUS 버스 전용"}
+                          {activeBusType === BusType.BUS1 ? "＋ PLUS 버스 전용" : "ー MINUS 버스 전용"}
                         </div>
                       </div>
                     ) : (
@@ -494,26 +494,26 @@ export default function DealerRoom({
                         <div className="tile-action-options">
                           <button
                             type="button"
-                            className={`tile-action-btn ${chosenBus === BusType.PLUS ? "tile-action-btn-active" : ""}`}
+                            className={`tile-action-btn ${chosenBus === BusType.BUS1 ? "tile-action-btn-active" : ""}`}
                             style={{
-                              background: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                              borderColor: chosenBus === BusType.PLUS ? "var(--bus-plus)" : undefined,
-                              color: chosenBus === BusType.PLUS ? "white" : undefined,
+                              background: chosenBus === BusType.BUS1 ? "var(--bus-plus)" : undefined,
+                              borderColor: chosenBus === BusType.BUS1 ? "var(--bus-plus)" : undefined,
+                              color: chosenBus === BusType.BUS1 ? "white" : undefined,
                             }}
-                            onClick={() => setChosenBus(BusType.PLUS)}
+                            onClick={() => setChosenBus(BusType.BUS1)}
                             disabled={plusBusDisabled}
                           >
                             ＋ PLUS 버스
                           </button>
                           <button
                             type="button"
-                            className={`tile-action-btn ${chosenBus === BusType.MINUS ? "tile-action-btn-active" : ""}`}
+                            className={`tile-action-btn ${chosenBus === BusType.BUS2 ? "tile-action-btn-active" : ""}`}
                             style={{
-                              background: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                              borderColor: chosenBus === BusType.MINUS ? "var(--bus-minus)" : undefined,
-                              color: chosenBus === BusType.MINUS ? "white" : undefined,
+                              background: chosenBus === BusType.BUS2 ? "var(--bus-minus)" : undefined,
+                              borderColor: chosenBus === BusType.BUS2 ? "var(--bus-minus)" : undefined,
+                              color: chosenBus === BusType.BUS2 ? "white" : undefined,
                             }}
-                            onClick={() => setChosenBus(BusType.MINUS)}
+                            onClick={() => setChosenBus(BusType.BUS2)}
                             disabled={minusBusDisabled}
                           >
                             ー MINUS 버스
@@ -601,8 +601,8 @@ export default function DealerRoom({
                             key={i}
                             className="selected-chip"
                             style={{
-                              background: activeBusType === BusType.PLUS ? "var(--bus-plus)" : "var(--bus-minus)",
-                              boxShadow: activeBusType === BusType.PLUS ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
+                              background: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
+                              boxShadow: activeBusType === BusType.BUS1 ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
                             }}
                           >
                             <span>
@@ -641,7 +641,7 @@ export default function DealerRoom({
                       <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 2: 행동 선택</h3>
                     </div>
                     <p className="dealer-subtitle" style={{ marginBottom: 16 }}>
-                      이동이 적용되었습니다. <strong>{activeBusType === BusType.PLUS ? "PLUS" : "MINUS"} 버스</strong> 위치 (
+                      이동이 적용되었습니다. <strong>{activeBusType === BusType.BUS1 ? "PLUS" : "MINUS"} 버스</strong> 위치 (
                       {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
                     </p>
 
@@ -692,8 +692,8 @@ export default function DealerRoom({
                               try {
                                 const segment = wallBetweenTiles(activeBusPos, { x: tx, y: ty });
                                 const allWalls = [
-                                  ...game.buses.PLUS.walls,
-                                  ...game.buses.MINUS.walls,
+                                  ...game.buses.BUS1.walls,
+                                  ...game.buses.BUS2.walls,
                                 ];
                                 return allWalls.some((w: any) =>
                                   (w.from.x === segment.from.x && w.from.y === segment.from.y && w.to.x === segment.to.x && w.to.y === segment.to.y) ||

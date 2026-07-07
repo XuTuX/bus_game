@@ -14,8 +14,8 @@ export enum Facing {
 }
 
 export enum BusType {
-  PLUS = "PLUS",
-  MINUS = "MINUS",
+  BUS1 = "BUS1",
+  BUS2 = "BUS2",
 }
 
 export type Coord = { x: number; y: number };
@@ -23,7 +23,7 @@ export type CardKind = "STRAIGHT1" | "STRAIGHT2" | "STRAIGHT3" | "LEFT" | "RIGHT
 export type Rng = () => number;
 
 export interface Tile {
-  colour: Colour;
+  colour: Colour | null;
   scoreBonus?: number;
 }
 
@@ -61,20 +61,31 @@ export interface Player {
 
 export type PlayerSeed = Pick<Player, "id" | "team" | "name">;
 
+export interface SubwayState {
+  pos: Coord[];
+  facing: Facing;
+  active: boolean;
+}
+
 export interface GameState {
   board: Tile[][];
   buses: Record<BusType, BusState>;
+  subway: SubwayState;
   players: Player[];
   turnIndex: number;
   roundIndex: number;
   teamScores: Record<Colour, number>;
+  centerRulesActive: boolean;
+  colorArrivals: Record<BusType, Colour[]>;
+  logs: string[];
 }
 
 export type TurnActionKind = "MOVE" | "SWAP_TILE" | "PLACE_OBSTACLE";
 
 export interface MoveTurnAction {
   type?: "MOVE";
-  bus: BusType;
+  bus?: BusType;
+  subway?: boolean;
   cardIndex: number;
 }
 
@@ -98,6 +109,8 @@ export interface StepResult {
   regions: Region[];
   path?: Coord[];
   scoreGained?: number;
+  logs?: string[];
+  collisionPenalty?: boolean;
 }
 
 export const BOARD_SIZE = 9;
@@ -150,7 +163,7 @@ export function addWallSegment(
   bus: BusState,
   from: Coord,
   to: Coord,
-  busType = BusType.PLUS,
+  busType = BusType.BUS1,
   otherWalls: Wall[] = []
 ): boolean {
   const candidate: Wall = {
@@ -172,53 +185,107 @@ export function addWallSegment(
 export function step(
   bus: BusState,
   card: Card,
-  board: Tile[][],
-  busType = BusType.PLUS,
-  otherWalls: Wall[] = [],
-  blockedCoords: Coord[] = []
+  game: GameState,
+  busType: BusType
 ): StepResult {
+  const logs: string[] = [];
   if (card.kind === "LEFT" || card.kind === "RIGHT") {
     bus.facing = rotate(bus.facing, card.kind === "LEFT" ? "L" : "R");
-    return { applied: true, regions: [], path: [] };
+    logs.push(`${busType}가 ${card.kind === "LEFT" ? "왼쪽" : "오른쪽"}으로 회전했습니다.`);
+    return { applied: true, regions: [], path: [], logs };
   }
 
   const distance = straightDistance(card.kind);
   const path: Coord[] = [];
   let current = { ...bus.pos };
-  const existing = [...bus.walls, ...otherWalls];
+  const existing = Object.values(game.buses).flatMap(b => b.walls);
+  let collisionOccurred = false;
 
   for (let i = 0; i < distance; i++) {
     const next = stepCoord(current, bus.facing);
 
     // 1. Check off-board
-    if (next.x < 0 || next.x >= board.length || next.y < 0 || next.y >= board.length) {
-      break; // Stop before leaving the board
+    if (next.x < 0 || next.x >= game.board.length || next.y < 0 || next.y >= game.board.length) {
+      collisionOccurred = true;
+      logs.push(`${busType}이(가) 보드 밖으로 벗어나려다 충돌했습니다. -2점`);
+      break;
     }
 
-    // 2. Check other bus occupancy
-    if (blockedCoords.some((coord) => coordsEqual(coord, next))) {
-      break; // Stop before entering another bus's tile
+    // 2. Check center gray cell collision
+    if (game.centerRulesActive && next.x === 4 && next.y === 4) {
+      collisionOccurred = true;
+      logs.push(`중앙 회색 구역은 이제 막힌 구역입니다. ${busType} 충돌! -2점`);
+      break;
     }
 
-    // 3. Check wall/obstacle conflict
+    // 3. Check other bus occupancy
+    const otherBusType = busType === BusType.BUS1 ? BusType.BUS2 : BusType.BUS1;
+    const otherBus = game.buses[otherBusType];
+    if (coordsEqual(otherBus.pos, next)) {
+      collisionOccurred = true;
+      logs.push(`${busType}이(가) ${otherBusType}와(과) 충돌했습니다. -2점`);
+      break;
+    }
+
+    // 4. Check wall/obstacle conflict
     const segment = wallBetweenTiles(current, next);
-    if (wallConflicts(segment, existing)) {
-      break; // Stop before hitting the wall
+    const hitWall = existing.find(w => wallConflicts(segment, [w]));
+    if (hitWall) {
+      collisionOccurred = true;
+      if (hitWall.isObstacle) {
+        logs.push(`${busType}이(가) 장애물에 충돌했습니다. -2점`);
+        // Remove obstacle
+        for (const b of Object.values(game.buses)) {
+          b.walls = b.walls.filter(w => !wallConflicts(w, [hitWall]));
+        }
+      } else {
+        logs.push(`${busType}이(가) 벽에 충돌했습니다. -2점`);
+      }
+      break;
     }
 
-    // 4. Move is valid, apply it
     path.push(next);
     current = next;
   }
 
   bus.pos = current;
-  return { applied: true, regions: [], path };
+  return { applied: true, regions: [], path, logs, collisionPenalty: collisionOccurred };
+}
+
+export function stepSubway(subway: SubwayState, card: Card): StepResult {
+  const logs: string[] = [];
+  if (card.kind === "LEFT" || card.kind === "RIGHT") {
+    subway.facing = rotate(subway.facing, card.kind === "LEFT" ? "L" : "R");
+    logs.push(`지하철이 ${card.kind === "LEFT" ? "왼쪽" : "오른쪽"}으로 회전했습니다.`);
+    return { applied: true, regions: [], path: [], logs };
+  }
+
+  const distance = straightDistance(card.kind);
+  const path: Coord[] = [];
+
+  for (let i = 0; i < distance; i++) {
+    const next = stepCoord(subway.pos[0], subway.facing);
+    if (next.x < 0 || next.x >= BOARD_SIZE || next.y < 0 || next.y >= BOARD_SIZE) {
+      logs.push(`지하철이 보드 밖으로 나갈 수 없어 멈췄습니다.`);
+      break;
+    }
+    // Move body (Snake)
+    subway.pos.unshift(next);
+    subway.pos.pop();
+    path.push(next);
+  }
+  
+  if (distance > 0) {
+    logs.push(`지하철이 ${path.length}칸 이동했습니다.`);
+  }
+
+  return { applied: true, regions: [], path, logs };
 }
 
 export function floodFillRegions(
   bus: BusState,
   board: Tile[][],
-  busType = BusType.PLUS
+  busType = BusType.BUS1
 ): Region[] {
   const size = board.length;
   const visited = new Set<string>();
@@ -282,10 +349,12 @@ export function scoreRegion(region: Region, game: GameState): void {
   if (region.scored) {
     return;
   }
-  const sign = region.bus === BusType.PLUS ? 1 : -1;
+  const sign = region.bus === BusType.BUS1 ? 1 : -1;
   for (const tile of region.tiles) {
     const colour = game.board[tile.y][tile.x].colour;
-    game.teamScores[colour] += sign;
+    if (colour) {
+      game.teamScores[colour] += sign;
+    }
   }
   region.scored = true;
 }
@@ -301,6 +370,7 @@ export function generateBoard(rng: Rng = Math.random): Tile[][] {
     const cells: Colour[] = [];
     if (fillBoardColours(cells, remaining, rng)) {
       const board = toBoard(cells);
+      board[4][4].colour = null; // Center is gray
       if (boardMeetsGlobalRules(board)) {
         return board;
       }
@@ -326,6 +396,10 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
     throw new Error("Game is already over");
   }
 
+  if (actions.length === 0) {
+    throw new Error("반드시 카드를 사용해야 합니다. (패스 금지)");
+  }
+
   // Validate moves
   if (actions.length > 3) {
     throw new Error("A turn may play at most 3 cards");
@@ -341,20 +415,91 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
   const results: StepResult[] = [];
   for (const action of actions) {
     const [card] = player.hand.splice(action.cardIndex, 1);
-    const bus = game.buses[action.bus];
-    const otherWalls = Object.entries(game.buses)
-      .filter(([type]) => type !== action.bus)
-      .flatMap(([, state]) => state.walls);
-    const blockedCoords = Object.entries(game.buses)
-      .filter(([type]) => type !== action.bus)
-      .map(([, state]) => state.pos);
-    const result = step(bus, card, game.board, action.bus, otherWalls, blockedCoords);
-    if (result.applied && result.path) {
-      result.scoreGained = scorePathTiles(result.path, action.bus, game);
-      result.regions = [];
+    
+    let result: StepResult;
+    if (action.subway) {
+      result = stepSubway(game.subway, card);
+    } else {
+      const busType = action.bus ?? BusType.BUS1;
+      const bus = game.buses[busType];
+      result = step(bus, card, game, busType);
+      
+      // Update Center Rules
+      if (!game.centerRulesActive) {
+        const b1 = game.buses[BusType.BUS1].pos;
+        const b2 = game.buses[BusType.BUS2].pos;
+        if ((b1.x !== 4 || b1.y !== 4) && (b2.x !== 4 || b2.y !== 4)) {
+          game.centerRulesActive = true;
+          if (result.logs) result.logs.push("두 버스가 모두 중앙을 벗어나, 이제 중앙 구역은 막혔습니다.");
+        }
+      }
+
+      // Handle collision penalty
+      if (result.collisionPenalty) {
+        game.teamScores[player.team] -= 2;
+      }
+
+      // Handle path scoring and arrivals
+      if (result.applied && result.path && result.path.length > 0) {
+        let gained = 0;
+        for (const coord of result.path) {
+          const tile = game.board[coord.y]?.[coord.x];
+          if (!tile || !tile.colour) continue;
+          
+          const score = 1 + (tile.scoreBonus ?? 0);
+          game.teamScores[tile.colour] += score;
+          gained += score;
+
+          // Arrival check
+          if (!game.colorArrivals[busType].includes(tile.colour)) {
+            game.colorArrivals[busType].push(tile.colour);
+            if (result.logs) result.logs.push(`${tile.colour}이(가) ${busType}에 도착했습니다. 기본 점수 획득!`);
+            
+            const otherBus = busType === BusType.BUS1 ? BusType.BUS2 : BusType.BUS1;
+            if (game.colorArrivals[otherBus].includes(tile.colour)) {
+              game.teamScores[tile.colour] += 3; // Bonus
+              if (result.logs) result.logs.push(`${tile.colour}이(가) 두 버스에 모두 도착했습니다. 보너스 +3점!`);
+            }
+          }
+        }
+        result.scoreGained = gained;
+      }
+
+      // Distance Penalty
+      const b1 = game.buses[BusType.BUS1].pos;
+      const b2 = game.buses[BusType.BUS2].pos;
+      const dist = Math.abs(b1.x - b2.x) + Math.abs(b1.y - b2.y);
+      if (dist === 1 || dist === 2) {
+        game.teamScores[player.team] -= 1;
+        if (result.logs) result.logs.push(`버스 간 거리가 너무 가깝습니다! ${player.team}팀 -1점`);
+      }
     }
+    
+    // Add logs to global game logs
+    if (result.logs && result.logs.length > 0) {
+      game.logs.push(...result.logs);
+    }
+    
     results.push(result);
   }
+
+  // End of turn Subway scoring
+  if (actions.length > 0) {
+    let subwayGained = 0;
+    const scoredColors = new Set<Colour>();
+    for (const pos of game.subway.pos) {
+      const tile = game.board[pos.y]?.[pos.x];
+      if (tile && tile.colour) {
+        scoredColors.add(tile.colour);
+      }
+    }
+    for (const colour of scoredColors) {
+      game.teamScores[colour] += 1;
+      subwayGained += 1;
+      game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
+    }
+  }
+
   return results;
 }
 
@@ -414,18 +559,7 @@ export function runActionPhase(
 }
 
 function scorePathTiles(path: Coord[], bus: BusType, game: GameState): number {
-  let total = 0;
-  const sign = bus === BusType.MINUS ? -1 : 1;
-  for (const coord of path) {
-    const tile = game.board[coord.y]?.[coord.x];
-    if (!tile) {
-      continue;
-    }
-    const score = 1 + (tile.scoreBonus ?? 0);
-    game.teamScores[tile.colour] += score * sign;
-    total += score * sign;
-  }
-  return total;
+  return 0; // Deprecated, logic moved to runMovePhase
 }
 
 export function nextPlayer(game: GameState): Player {
@@ -449,23 +583,41 @@ export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): 
   return {
     board: generateBoard(rng),
     buses: {
-      [BusType.PLUS]: {
+      [BusType.BUS1]: {
         pos: { x: 4, y: 4 },
         facing: Facing.E,
         walls: [],
         regions: [],
       },
-      [BusType.MINUS]: {
+      [BusType.BUS2]: {
         pos: { x: 4, y: 4 },
         facing: Facing.W,
         walls: [],
         regions: [],
       },
     },
+    subway: {
+      pos: [
+        { x: 5, y: 0 },
+        { x: 4, y: 0 },
+        { x: 3, y: 0 },
+        { x: 2, y: 0 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+      ],
+      facing: Facing.E,
+      active: false,
+    },
     players,
     turnIndex: 0,
     roundIndex: 0,
     teamScores: emptyScores(),
+    centerRulesActive: false,
+    colorArrivals: {
+      [BusType.BUS1]: [],
+      [BusType.BUS2]: [],
+    },
+    logs: [],
   };
 }
 
@@ -479,7 +631,8 @@ export function boardToSymbols(board: Tile[][]): string {
     .join("\n");
 }
 
-export function colourSymbol(colour: Colour): string {
+export function colourSymbol(colour: Colour | null): string {
+  if (!colour) return "X";
   switch (colour) {
     case Colour.Red:
       return "R";
@@ -587,7 +740,7 @@ export function wallBetweenTiles(fromTile: Coord, toTile: Coord): Omit<Wall, "bu
 }
 
 export function wallConflicts(candidate: Omit<Wall, "bus">, existing: Wall[]): boolean {
-  const candidateWall = { ...candidate, bus: BusType.PLUS };
+  const candidateWall = { ...candidate, bus: BusType.BUS1 };
   return existing.some(
     (wall) => wallKey(wall) === wallKey(candidateWall) || segmentsCrossInside(wall, candidateWall)
   );
@@ -769,13 +922,14 @@ function boardMeetsGlobalRules(board: Tile[][]): boolean {
 function hasExpectedCounts(board: Tile[][]): boolean {
   const counts = countColours(board);
   const sorted = [...counts.values()].sort((a, b) => a - b);
-  return sorted.join(",") === "16,16,16,16,17";
+  return sorted.join(",") === "16,16,16,16,16" || sorted.join(",") === "15,16,16,16,17";
 }
 
 function hasNoThreeInRow(board: Tile[][]): boolean {
   for (let y = 0; y < BOARD_SIZE; y += 1) {
     for (let x = 0; x < BOARD_SIZE; x += 1) {
       const colour = board[y][x].colour;
+      if (!colour) continue;
       if (x <= BOARD_SIZE - 3 && board[y][x + 1].colour === colour && board[y][x + 2].colour === colour) {
         return false;
       }
@@ -791,6 +945,7 @@ function hasNoMonochromeTwoByTwo(board: Tile[][]): boolean {
   for (let y = 0; y < BOARD_SIZE - 1; y += 1) {
     for (let x = 0; x < BOARD_SIZE - 1; x += 1) {
       const colour = board[y][x].colour;
+      if (!colour) continue;
       if (
         board[y][x + 1].colour === colour &&
         board[y + 1][x].colour === colour &&
@@ -810,7 +965,9 @@ function centresOfMassAreNearCentre(board: Tile[][]): boolean {
   }
   for (let y = 0; y < BOARD_SIZE; y += 1) {
     for (let x = 0; x < BOARD_SIZE; x += 1) {
-      const sum = sums.get(board[y][x].colour) as { x: number; y: number; count: number };
+      const colour = board[y][x].colour;
+      if (!colour) continue;
+      const sum = sums.get(colour)!;
       sum.x += x;
       sum.y += y;
       sum.count += 1;
@@ -818,6 +975,7 @@ function centresOfMassAreNearCentre(board: Tile[][]): boolean {
   }
 
   return [...sums.values()].every((sum) => {
+    if (sum.count === 0) return true;
     const centreX = sum.x / sum.count;
     const centreY = sum.y / sum.count;
     return Math.abs(centreX - 4) + Math.abs(centreY - 4) <= 1.5;
@@ -831,7 +989,9 @@ function countColours(board: Tile[][]): Map<Colour, number> {
   }
   for (const row of board) {
     for (const tile of row) {
-      counts.set(tile.colour, (counts.get(tile.colour) ?? 0) + 1);
+      if (tile.colour) {
+        counts.set(tile.colour, (counts.get(tile.colour) ?? 0) + 1);
+      }
     }
   }
   return counts;

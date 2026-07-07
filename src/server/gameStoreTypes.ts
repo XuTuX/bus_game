@@ -41,12 +41,12 @@ export interface RoomState {
   logIdCounter: number;
   playerIdCounter: number;
   pendingMoves: {
-    PLUS?: MoveTurnAction[];
-    MINUS?: MoveTurnAction[];
+    BUS1?: MoveTurnAction[];
+    BUS2?: MoveTurnAction[];
   };
   pendingActions: {
-    PLUS?: ActionPhaseTurnAction | null;
-    MINUS?: ActionPhaseTurnAction | null;
+    BUS1?: ActionPhaseTurnAction | null;
+    BUS2?: ActionPhaseTurnAction | null;
   };
   phaseStartedAt?: number;
   phaseDeadlineAt?: number;
@@ -60,8 +60,8 @@ export interface RoomTimerSettings {
 }
 
 export interface TurnControllers {
-  plusPlayer?: GameState["players"][number];
-  minusPlayer?: GameState["players"][number];
+  bus1Player?: GameState["players"][number];
+  bus2Player?: GameState["players"][number];
 }
 
 export interface RoomRecord {
