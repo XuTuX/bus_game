@@ -1,4 +1,4 @@
-import { BusType, type Card } from "@/lib/game";
+import { type Card } from "@/lib/game";
 import { getRoomTimerSettings } from "./gameStoreTimers";
 import {
   type RoomRecord,
@@ -7,6 +7,8 @@ import {
 } from "./gameStoreTypes";
 import {
   deepClone,
+  getSubwayMoveTeams,
+  getSubwayTeamPlayerOptions,
   getTurnControllers,
 } from "./gameStoreUtils";
 
@@ -16,7 +18,12 @@ export function buildPublicState(record: RoomRecord) {
   safeGame.players.forEach((player) => {
     (player.hand as any) = Array(player.hand.length).fill({ kind: "HIDDEN" });
   });
-  const { bus1Player, bus2Player, busTeam } = getTurnControllers(room.game);
+  const { busTeam } = getTurnControllers(room.game);
+  const subwayMoveTeams = getSubwayMoveTeams(room.game);
+  const subwayTeamPlayers = getSubwayTeamPlayerOptions(room.game);
+  const pendingSubwayMoves = Object.fromEntries(
+    subwayMoveTeams.map((team) => [team, !!room.pendingSubwayMoves?.[team]])
+  );
 
   return {
     game: safeGame,
@@ -33,18 +40,9 @@ export function buildPublicState(record: RoomRecord) {
       BUS2: room.pendingActions.BUS2 !== undefined,
     },
     busTeam,
-    subwayControllers: {
-      BUS1: bus1Player
-        ? { playerId: bus1Player.id, playerName: bus1Player.name, team: bus1Player.team }
-        : null,
-      BUS2: bus2Player
-        ? { playerId: bus2Player.id, playerName: bus2Player.name, team: bus2Player.team }
-        : null,
-    },
-    pendingSubwayMoves: {
-      BUS1: !!room.pendingSubwayMoves?.BUS1,
-      BUS2: !!room.pendingSubwayMoves?.BUS2,
-    },
+    subwayMoveTeams,
+    subwayTeamPlayers,
+    pendingSubwayMoves,
     ...getRoomTimingMeta(record),
   };
 }
@@ -95,14 +93,10 @@ function getActivePlayerNames(room: RoomState): string | null {
     if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
       names.push(`${bus2Player.name}(BUS2)`);
     }
-    if (bus1Player && !room.pendingSubwayMoves?.[BusType.BUS1]) {
-      names.push(`${bus1Player.name}(지하철1)`);
-    }
-    if (
-      bus2Player &&
-      !room.pendingSubwayMoves?.[BusType.BUS2]
-    ) {
-      names.push(`${bus2Player.name}(지하철2)`);
+    for (const team of getSubwayMoveTeams(room.game)) {
+      if (!room.pendingSubwayMoves?.[team]) {
+        names.push(`${team}팀(지하철)`);
+      }
     }
   } else if (room.status === "ACTION_PHASE") {
     if (bus1Player && room.pendingActions.BUS1 === undefined) {
@@ -115,11 +109,10 @@ function getActivePlayerNames(room: RoomState): string | null {
     ) {
       names.push(`${bus2Player.name}(BUS2)`);
     }
-    if (bus1Player && !room.pendingSubwayMoves?.[BusType.BUS1]) {
-      names.push(`${bus1Player.name}(지하철1)`);
-    }
-    if (bus2Player && !room.pendingSubwayMoves?.[BusType.BUS2]) {
-      names.push(`${bus2Player.name}(지하철2)`);
+    for (const team of getSubwayMoveTeams(room.game)) {
+      if (!room.pendingSubwayMoves?.[team]) {
+        names.push(`${team}팀(지하철)`);
+      }
     }
   }
 

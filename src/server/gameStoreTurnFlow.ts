@@ -28,6 +28,7 @@ import {
 import {
   deepClone,
   findClonePlayer,
+  getSubwayMoveTeams,
   getTurnControllers,
 } from "./gameStoreUtils";
 
@@ -126,7 +127,7 @@ function submitSubwayMovePhase(
   }
 
   if (actions.length > 1) {
-    throw new Error("지하철 조작 카드는 지하철당 최대 1장만 낼 수 있습니다.");
+    throw new Error("지하철 조작 카드는 팀당 최대 1장만 낼 수 있습니다.");
   }
 
   const action = actions[0];
@@ -135,24 +136,25 @@ function submitSubwayMovePhase(
     throw new Error("유효하지 않은 지하철입니다.");
   }
 
-  const { bus1Player, bus2Player } = getTurnControllers(room.game);
-  const subwayController = subway === BusType.BUS1 ? bus1Player : bus2Player;
-  if (!subwayController) {
-    throw new Error("이번 차례 해당 지하철 조작 담당자가 없습니다.");
-  }
-  if (player.id !== subwayController.id) {
-    throw new Error(subway === BusType.BUS1 ? "1호선 지하철 조작 권한이 없습니다." : "2호선 지하철 조작 권한이 없습니다.");
+  const { busTeam } = getTurnControllers(room.game);
+  if (player.team === busTeam) {
+    throw new Error("버스를 조작하는 팀은 이번 차례 지하철을 조작할 수 없습니다.");
   }
 
-  if (room.pendingSubwayMoves[subway]) {
-    throw new Error("이미 이 지하철 제출이 완료되었습니다.");
+  const subwayTeams = getSubwayMoveTeams(room.game);
+  if (!subwayTeams.includes(player.team)) {
+    throw new Error("이번 차례 지하철 조작 대상 팀이 아닙니다.");
+  }
+
+  if (room.pendingSubwayMoves[player.team]) {
+    throw new Error("이미 이 팀의 지하철 제출이 완료되었습니다.");
   }
 
   if (action && (action.cardIndex < 0 || action.cardIndex >= player.hand.length)) {
     throw new Error(`Invalid card index ${action.cardIndex}`);
   }
 
-  room.pendingSubwayMoves[subway] = {
+  room.pendingSubwayMoves[player.team] = {
     playerId: player.id,
     team: player.team,
     subway,
@@ -248,10 +250,8 @@ function resolveActionPhaseIfReady(room: RoomState) {
     return;
   }
 
-  if (
-    (bus1Player && !room.pendingSubwayMoves.BUS1) ||
-    (bus2Player && !room.pendingSubwayMoves.BUS2)
-  ) {
+  const subwayTeams = getSubwayMoveTeams(room.game);
+  if (subwayTeams.some((team) => !room.pendingSubwayMoves[team])) {
     return;
   }
 
@@ -280,8 +280,8 @@ function resolveActionPhaseIfReady(room: RoomState) {
 
   scoreCurrentBusRegions(clone);
 
-  for (const subway of [BusType.BUS1, BusType.BUS2] as const) {
-    const submission = room.pendingSubwayMoves[subway];
+  for (const team of subwayTeams) {
+    const submission = room.pendingSubwayMoves[team];
     if (submission) {
       appendSubwayLogAction(actionDetails, clone, submission);
     }

@@ -16,7 +16,7 @@ import {
   usePhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
-import { BusType, COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
+import { COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -75,7 +75,8 @@ export default function AdminPage({
   }
 
   const { status, game, participants, logs, activePlayerNames } = state;
-  const pendingSubwayMoves = state.pendingSubwayMoves ?? { BUS1: false, BUS2: false };
+  const subwayMoveTeams = state.subwayMoveTeams ?? [];
+  const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
   const canStartGame = participants.length > 0;
   const timerButtonLabel =
     status === "WAITING"
@@ -336,11 +337,12 @@ export default function AdminPage({
               <p>
                 {activePlayerNames} 님이 제출하면 바로 공개판에 반영됩니다.
               </p>
-              {(status === "CHOOSING" || status === "ACTION_PHASE") && (
+              {(status === "CHOOSING" || status === "ACTION_PHASE") && subwayMoveTeams.length > 0 && (
                 <div className="status-metadata" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {([BusType.BUS1, BusType.BUS2] as const).map((subway) => (
-                    <span key={subway} className="team-pill">
-                      {subway === BusType.BUS1 ? "1호선" : "2호선"} 지하철: {pendingSubwayMoves[subway] ? "완료" : "대기"}
+                  {subwayMoveTeams.map((team) => (
+                    <span key={team} className="team-pill">
+                      <span className={`score-dot score-dot-${team}`} />
+                      {team} 지하철: {pendingSubwayMoves[team] ? "완료" : "대기"}
                     </span>
                   ))}
                 </div>

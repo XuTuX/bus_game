@@ -35,14 +35,15 @@ export type PublicStateResult = {
     BUS2: boolean;
   };
   busTeam?: Colour;
-  subwayControllers?: {
-    BUS1: { playerId: string; playerName?: string; team: Colour } | null;
-    BUS2: { playerId: string; playerName?: string; team: Colour } | null;
-  };
-  pendingSubwayMoves?: {
-    BUS1: boolean;
-    BUS2: boolean;
-  };
+  subwayMoveTeams?: Colour[];
+  subwayTeamPlayers?: Partial<Record<Colour, {
+    playerId: string;
+    playerName?: string;
+    team: Colour;
+    room: BusType;
+    roomIndex: number;
+  }[]>>;
+  pendingSubwayMoves?: Partial<Record<Colour, boolean>>;
 } & TimingState;
 
 export type PrivateStateResult = {

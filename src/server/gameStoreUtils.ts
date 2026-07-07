@@ -1,10 +1,19 @@
 import {
+  BusType,
   COLOURS,
   type Colour,
   getRoundColourOrder,
   type GameState,
 } from "@/lib/game";
 import { type TurnControllers } from "./gameStoreTypes";
+
+export type SubwayTeamPlayerOption = {
+  playerId: string;
+  playerName?: string;
+  team: Colour;
+  room: BusType;
+  roomIndex: number;
+};
 
 export function getTurnControllers(game: GameState): TurnControllers {
   // 라운드마다 색상 순서를 한 칸씩 밀고, 두 버스 모두 동일한 순서(빨강 -> 주황 -> 노랑 -> 초록 -> 파랑)로 진행되므로 같은 색상 팀이 조작합니다.
@@ -35,6 +44,59 @@ export function getSubwayTeamOrder(game: GameState): Colour[] {
     ...roundColourOrder.slice(startIndex),
     ...roundColourOrder.slice(0, startIndex),
   ];
+}
+
+export function getSubwayTeamPlayerOptions(
+  game: GameState
+): Partial<Record<Colour, SubwayTeamPlayerOption[]>> {
+  const { busTeam } = getTurnControllers(game);
+  const result: Partial<Record<Colour, SubwayTeamPlayerOption[]>> = {};
+
+  for (const room of [BusType.BUS1, BusType.BUS2] as const) {
+    for (const entry of getRoomOrderedPlayers(game, room)) {
+      if (entry.player.team === busTeam) {
+        continue;
+      }
+      const teamOptions = result[entry.player.team] ?? [];
+      if (!teamOptions.some((option) => option.playerId === entry.player.id)) {
+        teamOptions.push({
+          playerId: entry.player.id,
+          playerName: entry.player.name,
+          team: entry.player.team,
+          room,
+          roomIndex: entry.roomIndex,
+        });
+      }
+      result[entry.player.team] = teamOptions;
+    }
+  }
+
+  return result;
+}
+
+function getRoomOrderedPlayers(game: GameState, busType: BusType) {
+  const grouped = new Map<Colour, GameState["players"]>();
+  for (const colour of COLOURS) {
+    grouped.set(colour, []);
+  }
+  for (const player of game.players) {
+    grouped.get(player.team)?.push(player);
+  }
+
+  const roundColourOrder = getRoundColourOrder(game.roundIndex);
+  const roomColours =
+    busType === BusType.BUS1 ? roundColourOrder : [...roundColourOrder].reverse();
+
+  return roomColours
+    .flatMap((colour) => {
+      const players = grouped.get(colour) ?? [];
+      const player = busType === BusType.BUS1 ? players[0] : players[1] ?? players[0];
+      return player ? [{ player, roomIndex: 0 }] : [];
+    })
+    .map((entry, index) => ({
+      ...entry,
+      roomIndex: index + 1,
+    }));
 }
 
 export function findClonePlayer(game: GameState, playerId: string): GameState["players"][number] {

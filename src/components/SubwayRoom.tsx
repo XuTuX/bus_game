@@ -42,6 +42,14 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Blue: "var(--team-blue)",
 };
 
+const TEAM_BG_VARS: Record<Colour, string> = {
+  Red: "var(--team-red-bg)",
+  Orange: "var(--team-orange-bg)",
+  Yellow: "var(--team-yellow-bg)",
+  Green: "var(--team-green-bg)",
+  Blue: "var(--team-blue-bg)",
+};
+
 const CARD_ORDER: CardKind[] = [
   "STRAIGHT1",
   "STRAIGHT2",
@@ -62,42 +70,62 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   const publicState = usePublicGame(roomCode);
   const game = publicState?.game as GameState | undefined;
   const phaseTimeLabel = usePhaseTimeLabel(publicState);
+  const subwayTeams = useMemo(
+    () => publicState?.subwayMoveTeams ?? [],
+    [publicState?.subwayMoveTeams]
+  );
+  const subwayTeamPlayers = useMemo(
+    () => publicState?.subwayTeamPlayers ?? {},
+    [publicState?.subwayTeamPlayers]
+  );
   const pendingSubwayMoves = useMemo(
-    () => publicState?.pendingSubwayMoves ?? { BUS1: false, BUS2: false },
+    () => publicState?.pendingSubwayMoves ?? {},
     [publicState?.pendingSubwayMoves]
   );
-  const subwayControllers = publicState?.subwayControllers;
 
   const [selectedSubway, setSelectedSubway] = useState<BusType>(BusType.BUS1);
+  const [selectedTeam, setSelectedTeam] = useState<Colour | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedKind, setSelectedKind] = useState<CardKind | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const selectedController =
-    selectedSubway === BusType.BUS1
-      ? subwayControllers?.BUS1
-      : subwayControllers?.BUS2;
+  const selectedTeamPlayers = selectedTeam ? subwayTeamPlayers[selectedTeam] ?? [] : [];
   const selectedPrivateState = usePrivateGame(roomCode, selectedPlayerId);
   const hand = selectedPrivateState?.hand ?? [];
-  const isSelectedSubwaySubmitted = !!pendingSubwayMoves[selectedSubway];
+  const isSelectedTeamSubmitted = selectedTeam
+    ? !!pendingSubwayMoves[selectedTeam]
+    : false;
   const canSubwaySubmitPhase =
     publicState?.status === "CHOOSING" || publicState?.status === "ACTION_PHASE";
   const canSubmit =
     canSubwaySubmitPhase &&
-    !!selectedController &&
-    !isSelectedSubwaySubmitted &&
+    !!selectedTeam &&
+    subwayTeams.includes(selectedTeam) &&
+    !isSelectedTeamSubmitted &&
     !!selectedPlayerId &&
     !submitting;
 
   useEffect(() => {
-    setSelectedPlayerId(selectedController?.playerId ?? "");
+    const firstOpenTeam =
+      subwayTeams.find((team) => !pendingSubwayMoves[team]) ?? subwayTeams[0] ?? null;
+    setSelectedTeam((current) =>
+      current && subwayTeams.includes(current) ? current : firstOpenTeam
+    );
+  }, [pendingSubwayMoves, subwayTeams]);
+
+  useEffect(() => {
+    setSelectedPlayerId((current) =>
+      selectedTeamPlayers.some((player) => player.playerId === current)
+        ? current
+        : selectedTeamPlayers[0]?.playerId ?? ""
+    );
     setErrorMsg("");
-  }, [selectedController?.playerId]);
+  }, [selectedTeamPlayers]);
 
   useEffect(() => {
     setSelectedKind(null);
-  }, [selectedPlayerId, selectedSubway]);
+  }, [selectedPlayerId, selectedTeam, selectedSubway]);
 
   const getCardCount = (kind: CardKind) =>
     hand.filter((card) => card.kind === kind).length;
@@ -187,7 +215,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
           <section className="dealer-panel dealer-hand-pane">
             <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
               <h2 className="brand-font">지하철 입력</h2>
-              <span>지하철당 카드 최대 1장</span>
+              <span>팀당 카드 최대 1장</span>
             </div>
 
             {errorMsg && <div className="error-box">{errorMsg}</div>}
@@ -195,61 +223,84 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
             <div style={{ marginBottom: 18 }}>
               <label className="subway-control-label">움직일 지하철</label>
               <div className="tile-action-options">
-                {([BusType.BUS1, BusType.BUS2] as const).map((subway) => {
-                  const controller =
-                    subway === BusType.BUS1
-                      ? subwayControllers?.BUS1
-                      : subwayControllers?.BUS2;
-                  const submitted = !!pendingSubwayMoves[subway];
-                  return (
-                    <button
-                      key={subway}
-                      type="button"
-                      className={`tile-action-btn ${selectedSubway === subway ? "tile-action-btn-active" : ""}`}
-                      onClick={() => setSelectedSubway(subway)}
-                      disabled={submitting || !controller}
-                    >
-                      <strong>{subway === BusType.BUS1 ? "1호선" : "2호선"}</strong>
-                      <span style={{ display: "block", fontSize: "0.82rem", marginTop: 4 }}>
-                        {controller
-                          ? `${controller.playerName ?? controller.playerId} · ${controller.team}`
-                          : "담당자 없음"}
-                        {" · "}
-                        {submitted ? "제출 완료" : "입력 대기"}
-                      </span>
-                    </button>
-                  );
-                })}
+                {([BusType.BUS1, BusType.BUS2] as const).map((subway) => (
+                  <button
+                    key={subway}
+                    type="button"
+                    className={`tile-action-btn ${selectedSubway === subway ? "tile-action-btn-active" : ""}`}
+                    onClick={() => setSelectedSubway(subway)}
+                    disabled={submitting}
+                  >
+                    {subway === BusType.BUS1 ? "1호선" : "2호선"}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <label className="subway-control-label">제출 담당자</label>
-              <div className="dealer-wait-card" style={{ padding: 16 }}>
-                {selectedController ? (
-                  <div className="team-pill" style={{ justifyContent: "center" }}>
-                    <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[selectedController.team] }} />
-                    <span>
-                      {selectedController.playerName ?? selectedController.playerId}
-                      {" · "}
-                      {selectedController.team}
-                    </span>
+              <label className="subway-control-label">제출 팀</label>
+              <div className="subway-team-grid">
+                {subwayTeams.length === 0 ? (
+                  <div className="dealer-wait-card" style={{ gridColumn: "1 / -1" }}>
+                    <h3 className="brand-font">대기 중</h3>
+                    <p>현재 지하철을 조작할 팀이 없습니다.</p>
                   </div>
                 ) : (
-                  <p>선택한 지하철 담당자가 없습니다.</p>
+                  subwayTeams.map((team) => {
+                    const submitted = !!pendingSubwayMoves[team];
+                    return (
+                      <button
+                        key={team}
+                        type="button"
+                        className={`subway-team-button ${selectedTeam === team ? "subway-team-button-active" : ""}`}
+                        onClick={() => setSelectedTeam(team)}
+                        disabled={submitting}
+                        style={{
+                          borderColor: selectedTeam === team ? TEAM_COLOUR_VARS[team] : undefined,
+                          background: selectedTeam === team ? TEAM_BG_VARS[team] : undefined,
+                        }}
+                      >
+                        <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
+                        <strong>{team}</strong>
+                        <span>{submitted ? "제출 완료" : "입력 대기"}</span>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
+
+            {selectedTeam && (
+              <div style={{ marginBottom: 18 }}>
+                <label className="subway-control-label">제출 플레이어</label>
+                <div className="tile-action-options">
+                  {selectedTeamPlayers.map((player) => (
+                    <button
+                      key={player.playerId}
+                      type="button"
+                      className={`tile-action-btn ${selectedPlayerId === player.playerId ? "tile-action-btn-active" : ""}`}
+                      onClick={() => setSelectedPlayerId(player.playerId)}
+                      disabled={submitting || isSelectedTeamSubmitted}
+                    >
+                      <strong>{player.playerName ?? player.playerId}</strong>
+                      <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
+                        {player.room === BusType.BUS1 ? "버스 1방" : "버스 2방"} · {player.roomIndex}번
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {!canSubwaySubmitPhase ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">{STATUS_TEXT[publicState.status] ?? "대기 중"}</h3>
                 <p>이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다.</p>
               </div>
-            ) : isSelectedSubwaySubmitted ? (
+            ) : isSelectedTeamSubmitted ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">제출 완료</h3>
-                <p>{selectedSubway === BusType.BUS1 ? "1호선" : "2호선"} 지하철 입력이 이미 접수되었습니다.</p>
+                <p>{selectedTeam}팀의 지하철 입력이 이미 접수되었습니다.</p>
               </div>
             ) : (
               <>
