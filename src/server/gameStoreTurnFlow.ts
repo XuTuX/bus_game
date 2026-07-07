@@ -107,6 +107,7 @@ function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusTyp
   }
 
   const clone = deepClone(room.game);
+  clone.swappedTiles = [];
   const actionDetails: LogEntry["actions"] = [];
 
   if (bus1Player) {

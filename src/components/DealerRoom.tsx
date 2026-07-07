@@ -17,6 +17,7 @@ import {
   wallConflicts,
   type GameState,
   getRoundColourOrder,
+  stepSubway,
 } from "@/lib/game";
 import {
   submitAction,
@@ -62,7 +63,7 @@ const STATUS_TEXT = {
 // Convert chosen kinds into server-compatible relative indices
 function getMovesWithIndices(
   hand: { kind: CardKind }[],
-  selected: { kind: CardKind; bus: BusType }[]
+  selected: { kind: CardKind; bus: BusType; subway?: boolean }[]
 ): MoveTurnAction[] {
   const actions: MoveTurnAction[] = [];
   const remainingHand = [...hand];
@@ -72,7 +73,7 @@ function getMovesWithIndices(
     if (idx === -1) {
       throw new Error(`Card of type ${sel.kind} not found in hand.`);
     }
-    actions.push({ type: "MOVE", bus: sel.bus, cardIndex: idx });
+    actions.push({ type: "MOVE", bus: sel.bus, subway: sel.subway, cardIndex: idx });
     remainingHand.splice(idx, 1);
   }
   return actions;
@@ -113,8 +114,10 @@ export default function DealerRoom({
   // Movement selections
   const [chosenBus, setChosenBus] = useState<BusType>(BusType.BUS1);
   const [moveCategory, setMoveCategory] = useState<"FORWARD" | "ROTATE">("FORWARD");
-  const [selectedMoves, setSelectedMoves] = useState<CardKind[]>([]);
-  
+  type SelectedMove = { kind: CardKind; target: "BUS" | "SUBWAY" };
+  const [selectedMoves, setSelectedMoves] = useState<SelectedMove[]>([]);
+  const [moveTarget, setMoveTarget] = useState<"BUS" | "SUBWAY">("BUS");
+
   // Action phase states
   const [selectedActionType, setSelectedActionType] = useState<"SWAP_TILE" | "PLACE_OBSTACLE" | null>(null);
   const [actionTarget, setActionTarget] = useState<{ x: number; y: number } | null>(null);
@@ -225,14 +228,14 @@ export default function DealerRoom({
   // Group hand cards and calculate remaining unused counts
   const getCardCount = (kind: CardKind) => {
     const total = hand.filter((c) => c.kind === kind).length;
-    const used = selectedMoves.filter((k) => k === kind).length;
+    const used = selectedMoves.filter((m) => m.kind === kind).length;
     return Math.max(0, total - used);
   };
 
   const handleCardClick = (kind: CardKind) => {
     const remaining = getCardCount(kind);
     if (!canAct || status !== "CHOOSING" || submitting || remaining <= 0 || selectedMoves.length >= 3) return;
-    setSelectedMoves((prev) => [...prev, kind]);
+    setSelectedMoves((prev) => [...prev, { kind, target: moveTarget }]);
   };
 
   const activeBusType =
@@ -248,11 +251,12 @@ export default function DealerRoom({
   const roomBusLabel = selectedBus === BusType.BUS1 ? "버스 1" : "버스 2";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
-  // Generate 3x3 cells centered at the active bus position
+  // Generate cells centered at the active bus position
   const gridCells = [];
   if (status === "ACTION_PHASE") {
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
+    const radius = selectedActionType === "PLACE_OBSTACLE" ? 3 : 1;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
         const tx = activeBusPos.x + dx;
         const ty = activeBusPos.y + dy;
         const inBounds = tx >= 0 && tx < game.board.length && ty >= 0 && ty < game.board.length;
@@ -276,7 +280,17 @@ export default function DealerRoom({
       setAnimatedGame(animClone);
 
       for (let i = 0; i < selectedMoves.length; i++) {
-        const kind = selectedMoves[i];
+        const move = selectedMoves[i];
+        
+        if (move.target === "SUBWAY") {
+          const result = stepSubway(animClone.subways[activeBusType], { kind: move.kind } as any);
+          animClone.logs.push(...(result.logs || []));
+          setAnimatedGame({ ...animClone });
+          await delay(600);
+          continue;
+        }
+
+        const kind = move.kind;
         const bus = animClone.buses[activeBusType];
         const otherWalls = Object.entries(animClone.buses)
           .filter(([type]) => type !== activeBusType)
@@ -310,7 +324,7 @@ export default function DealerRoom({
       }
 
       // 2. Submit the actual moves to the server
-      const selectedWithBuses = selectedMoves.map((kind) => ({ kind, bus: activeBusType }));
+      const selectedWithBuses = selectedMoves.map((m) => ({ kind: m.kind, bus: activeBusType, subway: m.target === "SUBWAY" }));
       const moveActions = getMovesWithIndices(hand, selectedWithBuses);
       await submitAction(roomCode, resolvedPlayerId, moveActions, activeBusType);
       setSubmittedPreviewGame(JSON.parse(JSON.stringify(animClone)) as GameState);
@@ -522,6 +536,26 @@ export default function DealerRoom({
                       </div>
                     )}
 
+                    {/* 1.5. Target Tab */}
+                    <div style={{ display: "flex", gap: "10px", marginBottom: "15px", justifyContent: "center" }}>
+                      <button
+                        className={`btn ${moveTarget === "BUS" ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() => setMoveTarget("BUS")}
+                        style={{ padding: "8px 16px", borderRadius: "20px" }}
+                        disabled={submitting}
+                      >
+                        🚌 버스 조작
+                      </button>
+                      <button
+                        className={`btn ${moveTarget === "SUBWAY" ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() => setMoveTarget("SUBWAY")}
+                        style={{ padding: "8px 16px", borderRadius: "20px" }}
+                        disabled={submitting}
+                      >
+                        🚇 지하철 조작
+                      </button>
+                    </div>
+
                     {/* 2. Move Category Tab */}
                     <div className="action-mode-tabs" style={{ marginBottom: 20 }}>
                       <button
@@ -596,17 +630,21 @@ export default function DealerRoom({
                       {selectedMoves.length === 0 ? (
                         <div className="selected-empty">이동 방식(직진/회전)을 누르고 카드를 골라 선택하세요 (최대 3장)</div>
                       ) : (
-                        selectedMoves.map((kind, i) => (
+                        selectedMoves.map((m, i) => (
                           <div
                             key={i}
                             className="selected-chip"
                             style={{
-                              background: activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
-                              boxShadow: activeBusType === BusType.BUS1 ? "var(--shadow-glow-bus1)" : "var(--shadow-glow-bus2)",
+                              background: m.target === "SUBWAY" 
+                                ? (activeBusType === BusType.BUS1 ? "#111" : "#333") 
+                                : (activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)"),
+                              boxShadow: m.target === "SUBWAY"
+                                ? "none"
+                                : (activeBusType === BusType.BUS1 ? "var(--shadow-glow-bus1)" : "var(--shadow-glow-bus2)"),
                             }}
                           >
                             <span>
-                              {CARD_ICONS[kind]} {CARD_NAMES[kind]}
+                              {m.target === "SUBWAY" ? "🚇" : "🚌"} {CARD_ICONS[m.kind]} {CARD_NAMES[m.kind]}
                             </span>
                             <button
                               className="chip-remove"
@@ -676,38 +714,22 @@ export default function DealerRoom({
                             : "상하좌우 4칸 중 벽(장애물)이 없는 칸을 선택하여 설치하세요."}
                         </p>
 
-                        <div className="action-grid-3x3">
+                        <div className={selectedActionType === "PLACE_OBSTACLE" ? "action-grid-7x7" : "action-grid-3x3"}>
                           {gridCells.map(({ dx, dy, tx, ty, tile, inBounds }, index) => {
                             const isCenter = dx === 0 && dy === 0;
-                            const isOrthogonal = Math.abs(dx) + Math.abs(dy) === 1;
+                            const isCross = (dx === 0 && dy !== 0) || (dy === 0 && dx !== 0);
 
-                            // Hide diagonal cells for obstacle placement mode to avoid clutter
-                            if (selectedActionType === "PLACE_OBSTACLE" && !isOrthogonal && !isCenter) {
+                            // Hide non-cross cells for obstacle placement mode
+                            if (selectedActionType === "PLACE_OBSTACLE" && !isCross && !isCenter) {
                               return <div key={index} style={{ aspectRatio: 1 }} />;
                             }
 
-                            // Check if there is already a wall between the bus and this cell
-                            const hasExistingWall = (() => {
-                              if (!inBounds || !isOrthogonal) return false;
-                              try {
-                                const segment = wallBetweenTiles(activeBusPos, { x: tx, y: ty });
-                                const allWalls = [
-                                  ...game.buses.BUS1.walls,
-                                  ...game.buses.BUS2.walls,
-                                ];
-                                return allWalls.some((w: any) =>
-                                  (w.from.x === segment.from.x && w.from.y === segment.from.y && w.to.x === segment.to.x && w.to.y === segment.to.y) ||
-                                  (w.from.x === segment.to.x && w.from.y === segment.to.y && w.to.x === segment.from.x && w.to.y === segment.from.y)
-                                );
-                              } catch {
-                                return false;
-                              }
-                            })();
+                            const hasExistingObstacle = game.obstacles?.some(o => o.x === tx && o.y === ty);
 
                             const isSelected = actionTarget?.x === tx && actionTarget?.y === ty;
                             const isCellDisabled =
                               !inBounds ||
-                              (selectedActionType === "PLACE_OBSTACLE" && (!isOrthogonal || hasExistingWall));
+                              (selectedActionType === "PLACE_OBSTACLE" && (!isCross || hasExistingObstacle));
 
                             return (
                               <button
@@ -721,8 +743,8 @@ export default function DealerRoom({
                                   setActionTarget({ x: tx, y: ty });
                                 }}
                               >
-                                {hasExistingWall && <span style={{ fontSize: "0.8rem" }}>🚧</span>}
-                                {isCenter && <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "white", textShadow: "0 1px 2px black" }}>🚌</span>}
+                                {hasExistingObstacle && <span style={{ fontSize: "1.2rem" }}>🚧</span>}
+                                {isCenter && <span style={{ fontSize: "1rem", fontWeight: "bold", color: "white", textShadow: "0 1px 2px black" }}>🚌</span>}
                               </button>
                             );
                           })}

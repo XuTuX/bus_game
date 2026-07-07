@@ -35,7 +35,6 @@ export interface Wall {
   from: Coord;
   to: Coord;
   bus: BusType;
-  isObstacle?: boolean;
 }
 
 export interface Region {
@@ -78,6 +77,8 @@ export interface GameState {
   centerRulesActive: boolean;
   colorArrivals: Record<BusType, Colour[]>;
   logs: string[];
+  swappedTiles: [Coord, Coord][];
+  obstacles: Coord[];
 }
 
 export type TurnActionKind = "MOVE" | "SWAP_TILE" | "PLACE_OBSTACLE";
@@ -227,20 +228,21 @@ export function step(
       break;
     }
 
-    // 4. Check wall/obstacle conflict
+    // 4. Check wall conflict
     const segment = wallBetweenTiles(current, next);
     const hitWall = existing.find(w => wallConflicts(segment, [w]));
     if (hitWall) {
       collisionOccurred = true;
-      if (hitWall.isObstacle) {
-        logs.push(`${busType}이(가) 장애물에 충돌했습니다. -2점`);
-        // Remove obstacle
-        for (const b of Object.values(game.buses)) {
-          b.walls = b.walls.filter(w => !wallConflicts(w, [hitWall]));
-        }
-      } else {
-        logs.push(`${busType}이(가) 벽에 충돌했습니다. -2점`);
-      }
+      logs.push(`${busType}이(가) 벽에 충돌했습니다. -2점`);
+      break;
+    }
+
+    // 5. Check block obstacle collision
+    const hitObstacleIdx = game.obstacles.findIndex(o => coordsEqual(o, next));
+    if (hitObstacleIdx !== -1) {
+      collisionOccurred = true;
+      logs.push(`${busType}이(가) 장애물에 충돌했습니다. -2점`);
+      game.obstacles.splice(hitObstacleIdx, 1);
       break;
     }
 
@@ -520,39 +522,38 @@ export function runActionPhase(
     const busPos = bus.pos;
     const dx = Math.abs(action.target.x - busPos.x);
     const dy = Math.abs(action.target.y - busPos.y);
-    if (dx > 1 || dy > 1) {
-      result = { applied: false, reason: "target-out-of-range", regions: [] };
-    } else {
-      const targetTile = game.board[action.target.y]?.[action.target.x];
-      const busTile = game.board[busPos.y]?.[busPos.x];
 
-      if (!targetTile || !busTile) {
-        result = { applied: false, reason: "invalid-target", regions: [] };
-      } else if (action.type === "SWAP_TILE") {
+    const targetTile = game.board[action.target.y]?.[action.target.x];
+    const busTile = game.board[busPos.y]?.[busPos.x];
+
+    if (!targetTile || !busTile) {
+      result = { applied: false, reason: "invalid-target", regions: [] };
+    } else if (action.type === "SWAP_TILE") {
+      if (dx > 1 || dy > 1) {
+        result = { applied: false, reason: "target-out-of-range", regions: [] };
+      } else {
         // Swap tile positions. Tiles currently only carry colour data.
         const temp = busTile.colour;
         busTile.colour = targetTile.colour;
         targetTile.colour = temp;
-        result = { applied: true, regions: [] };
-      } else if (action.type === "PLACE_OBSTACLE") {
-        if (dx + dy !== 1) {
-          return { applied: false, reason: "target-not-adjacent", regions: [] };
-        }
-
-        const segment = wallBetweenTiles(busPos, action.target);
-        const allWalls = Object.values(game.buses).flatMap((state) => state.walls);
-        if (wallConflicts(segment, allWalls)) {
-          return { applied: false, reason: "obstacle-conflict", regions: [] };
-        }
-
-        bus.walls.push({
-          from: segment.from,
-          to: segment.to,
-          bus: action.bus,
-          isObstacle: true,
-        });
+        game.swappedTiles.push([busPos, action.target]);
         result = { applied: true, regions: [] };
       }
+    } else if (action.type === "PLACE_OBSTACLE") {
+      if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
+        return { applied: false, reason: "target-not-straight-line", regions: [] };
+      }
+      if (dx > 3 || dy > 3) {
+        return { applied: false, reason: "target-out-of-range", regions: [] };
+      }
+
+      const isObstacleExist = game.obstacles.some(o => o.x === action.target.x && o.y === action.target.y);
+      if (isObstacleExist) {
+        return { applied: false, reason: "obstacle-conflict", regions: [] };
+      }
+
+      game.obstacles.push(action.target);
+      result = { applied: true, regions: [] };
     }
   }
 
@@ -633,6 +634,8 @@ export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): 
       [BusType.BUS2]: [],
     },
     logs: [],
+    swappedTiles: [],
+    obstacles: [],
   };
 }
 

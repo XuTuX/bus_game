@@ -1396,6 +1396,20 @@ h1, h2, h3, .brand-font {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.grouped-card-row.tile-scored {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+.tile-swapped {
+  animation: swapHighlight 2s ease-in-out;
+}
+
+@keyframes swapHighlight {
+  0% { box-shadow: 0 0 0 0px rgba(255, 255, 255, 1); }
+  50% { box-shadow: 0 0 15px 4px rgba(255, 255, 255, 0.8); z-index: 5; }
+  100% { box-shadow: 0 0 0 0px rgba(255, 255, 255, 0); }
+}
 .grouped-card-info {
   display: flex;
   align-items: center;
@@ -1416,6 +1430,14 @@ h1, h2, h3, .brand-font {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   width: 200px;
+  margin: 16px auto;
+}
+
+.action-grid-7x7 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  width: 280px;
   margin: 16px auto;
 }
 .action-grid-cell {

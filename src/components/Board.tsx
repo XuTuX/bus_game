@@ -43,18 +43,28 @@ export default function Board({
     <div className="board-container">
       <div className="board-grid">
         {game.board.map((row, y) =>
-          row.map((tile, x) => (
-            <div
-              key={`${x}-${y}`}
-              className={`tile tile-${tile.colour ?? 'gray'}${
-                scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
-              }`}
-            >
-              {tile.scoreBonus ? (
-                <span className="tile-bonus">+{1 + tile.scoreBonus}</span>
-              ) : null}
-            </div>
-          ))
+          row.map((tile, x) => {
+            const isSwapped = game.swappedTiles?.some(pair =>
+              (pair[0].x === x && pair[0].y === y) || (pair[1].x === x && pair[1].y === y)
+            );
+            const hasObstacle = game.obstacles?.some(o => o.x === x && o.y === y);
+
+            return (
+              <div
+                key={`${x}-${y}`}
+                className={`tile tile-${tile.colour ?? 'gray'}${
+                  scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
+                } ${isSwapped ? "tile-swapped" : ""}`}
+              >
+                {tile.scoreBonus ? (
+                  <span className="tile-bonus">+{1 + tile.scoreBonus}</span>
+                ) : null}
+                {hasObstacle ? (
+                  <span className="tile-obstacle" style={{ fontSize: "24px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }}>🚧</span>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -89,9 +99,7 @@ export default function Board({
               x2={x2}
               y2={y2}
               className={
-                wall.isObstacle
-                  ? "wall-obstacle"
-                  : wall.busType === BusType.BUS1
+                wall.busType === BusType.BUS1
                   ? "wall-bus1"
                   : "wall-bus2"
               }
@@ -133,8 +141,8 @@ export default function Board({
       })}
 
       {game.subways && Object.entries(game.subways)
-        .filter(([busType]) => !showFacingFor || showFacingFor === busType)
         .map(([busType, subway]) => {
+          const isFaded = showFacingFor && showFacingFor !== busType;
           return subway.pos.map((pos, index) => {
             const step = tileSize + tileGap;
             const left = 12 + pos.x * step + tileSize / 2 - 12;
@@ -154,7 +162,8 @@ export default function Board({
                   borderRadius: index === 0 ? "6px" : "12px",
                   left,
                   top,
-                  zIndex: 10,
+                  zIndex: isFaded ? 5 : 10,
+                  opacity: isFaded ? 0.3 : 1,
                   boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
                   display: "flex",
                   alignItems: "center",
@@ -162,7 +171,7 @@ export default function Board({
                   color: "white",
                   fontSize: "10px",
                   fontWeight: "bold",
-                  border: "1px solid rgba(255,255,255,0.7)",
+                  border: isFaded ? "none" : "2px solid rgba(255,255,255,0.7)",
                 }}
               >
                 {index === 0 ? (isBus1 ? "S1" : "S2") : ""}
