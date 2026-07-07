@@ -112,17 +112,21 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   }, [pendingSubwayMoves, subwayTeams]);
 
   useEffect(() => {
-    if (!game || !selectedTeam) {
+    if (!selectedTeam) {
       setSelectedPlayerId("");
       return;
     }
-    const players = game.players.filter((player) => player.team === selectedTeam);
     setSelectedPlayerId((current) =>
-      players.some((player) => player.id === current) ? current : players[0]?.id ?? ""
+      playersForTeam.some((player) => player.id === current)
+        ? current
+        : playersForTeam[0]?.id ?? ""
     );
-    setSelectedKind(null);
     setErrorMsg("");
-  }, [game, selectedTeam]);
+  }, [playersForTeam, selectedTeam]);
+
+  useEffect(() => {
+    setSelectedKind(null);
+  }, [selectedPlayerId, selectedTeam]);
 
   const getCardCount = (kind: CardKind) =>
     hand.filter((card) => card.kind === kind).length;

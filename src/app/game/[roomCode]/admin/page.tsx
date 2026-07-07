@@ -55,31 +55,22 @@ export default function AdminPage({
   const [busyAction, setBusyAction] = useState(false);
   const [savingTimers, setSavingTimers] = useState(false);
   const [timerDirty, setTimerDirty] = useState(false);
-  const [moveMinutes, setMoveMinutes] = useState("3");
-  const [actionMinutes, setActionMinutes] = useState("2");
+  const [timerMinutes, setTimerMinutes] = useState("3");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     if (!state?.timerSettings || timerDirty) return;
-    setMoveMinutes(String(Math.round(state.timerSettings.movePhaseSeconds / 60)));
-    setActionMinutes(String(Math.round(state.timerSettings.actionPhaseSeconds / 60)));
+    setTimerMinutes(String(Math.round(state.timerSettings.movePhaseSeconds / 60)));
   }, [
     state?.timerSettings?.movePhaseSeconds,
-    state?.timerSettings?.actionPhaseSeconds,
     timerDirty,
   ]);
 
   useEffect(() => {
     if (!timerDirty) return;
 
-    const moveValue = Number(moveMinutes);
-    const actionValue = Number(actionMinutes);
-    if (
-      !Number.isFinite(moveValue) ||
-      !Number.isFinite(actionValue) ||
-      moveValue < 1 ||
-      actionValue < 1
-    ) {
+    const timerValue = Number(timerMinutes);
+    if (!Number.isFinite(timerValue) || timerValue < 1) {
       return;
     }
 
@@ -89,8 +80,8 @@ export default function AdminPage({
       setErrorMsg("");
       try {
         await adminSetTimers(roomCode, {
-          movePhaseSeconds: Math.round(moveValue * 60),
-          actionPhaseSeconds: Math.round(actionValue * 60),
+          movePhaseSeconds: Math.round(timerValue * 60),
+          actionPhaseSeconds: Math.round(timerValue * 60),
         });
         if (!cancelled) {
           setTimerDirty(false);
@@ -110,7 +101,7 @@ export default function AdminPage({
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [actionMinutes, moveMinutes, roomCode, timerDirty]);
+  }, [roomCode, timerDirty, timerMinutes]);
 
   if (!state) {
     return (
@@ -252,48 +243,31 @@ export default function AdminPage({
               <strong>{Math.min(game.roundIndex + 1, 5)} / 5</strong>
             </div>
             <div>
-              <span>현재 차례</span>
-              <strong>{activePlayerNames || "-"}</strong>
-            </div>
-            <div>
               <span>상태</span>
               <strong>{STATUS_LABELS[status]}</strong>
             </div>
-            {phaseTimeLabel && (
-              <div>
-                <span>남은 시간</span>
-                <strong>{phaseTimeLabel}</strong>
-              </div>
-            )}
+            <div>
+              <span>남은 시간</span>
+              <strong>{phaseTimeLabel || "-"}</strong>
+            </div>
+            <div className="admin-summary-current">
+              <span>현재 차례</span>
+              <strong>{activePlayerNames || "-"}</strong>
+            </div>
           </div>
 
           <div className="timer-settings-form">
             <label>
-              <span>이동 시간</span>
+              <span>타이머</span>
               <input
                 type="number"
                 min="1"
                 max="180"
-                value={moveMinutes}
+                value={timerMinutes}
                 disabled={savingTimers}
                 onChange={(event) => {
                   setTimerDirty(true);
-                  setMoveMinutes(event.target.value);
-                }}
-              />
-              <small>분</small>
-            </label>
-            <label>
-              <span>행동 시간</span>
-              <input
-                type="number"
-                min="1"
-                max="180"
-                value={actionMinutes}
-                disabled={savingTimers}
-                onChange={(event) => {
-                  setTimerDirty(true);
-                  setActionMinutes(event.target.value);
+                  setTimerMinutes(event.target.value);
                 }}
               />
               <small>분</small>

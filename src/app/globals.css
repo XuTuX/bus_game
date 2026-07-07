@@ -558,6 +558,11 @@ h1, h2, h3, .brand-font {
   border-radius: var(--radius-md);
   padding: 14px;
   text-align: left;
+  min-width: 0;
+}
+
+.admin-summary-current {
+  grid-column: 1 / -1;
 }
 
 .admin-summary span,
@@ -573,13 +578,22 @@ h1, h2, h3, .brand-font {
   margin-top: 6px;
   font-family: 'Fredoka', sans-serif;
   font-size: 1.1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.admin-summary-current strong {
+  font-size: 1rem;
+  max-height: 7.5rem;
+  overflow-y: auto;
+  white-space: normal;
 }
 
 .timer-settings-form {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 10px;
-  align-items: end;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   margin-bottom: 20px;
   padding: 14px;
   background: var(--bg-tertiary);
@@ -589,7 +603,7 @@ h1, h2, h3, .brand-font {
 
 .timer-settings-form label {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(70px, 1fr) auto;
   gap: 6px;
   align-items: center;
 }

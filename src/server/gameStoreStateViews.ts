@@ -108,7 +108,7 @@ function getActivePlayerNames(room: RoomState): string | null {
     }
   }
 
-  return names.length > 0 ? names.join(" & ") : null;
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 function isCurrentPlayerTurn(room: RoomState, playerId?: string) {
