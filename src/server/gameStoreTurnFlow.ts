@@ -127,7 +127,7 @@ function submitSubwayMovePhase(
   }
 
   if (actions.length > 1) {
-    throw new Error("지하철 조작 카드는 팀당 최대 1장만 낼 수 있습니다.");
+    throw new Error("지하철 조작 카드는 개인당 최대 1장만 낼 수 있습니다.");
   }
 
   const action = actions[0];
@@ -146,15 +146,22 @@ function submitSubwayMovePhase(
     throw new Error("이번 차례 지하철 조작 대상 팀이 아닙니다.");
   }
 
-  if (room.pendingSubwayMoves[player.team]) {
-    throw new Error("이미 이 팀의 지하철 제출이 완료되었습니다.");
+  const playersOfTeam = room.game.players.filter((p) => p.team === player.team);
+  const playerIdx = playersOfTeam.findIndex((p) => p.id === player.id);
+  const expectedSubway = playerIdx === 0 ? BusType.BUS1 : BusType.BUS2;
+  if (subway !== expectedSubway) {
+    throw new Error("자신의 역할에 맞지 않는 지하철을 조작하려고 시도했습니다.");
+  }
+
+  if (room.pendingSubwayMoves[player.id]) {
+    throw new Error("이미 지하철 제출이 완료되었습니다.");
   }
 
   if (action && (action.cardIndex < 0 || action.cardIndex >= player.hand.length)) {
     throw new Error(`Invalid card index ${action.cardIndex}`);
   }
 
-  room.pendingSubwayMoves[player.team] = {
+  room.pendingSubwayMoves[player.id] = {
     playerId: player.id,
     team: player.team,
     subway,
@@ -251,7 +258,8 @@ function resolveActionPhaseIfReady(room: RoomState) {
   }
 
   const subwayTeams = getSubwayMoveTeams(room.game);
-  if (subwayTeams.some((team) => !room.pendingSubwayMoves[team])) {
+  const subwayPlayers = room.game.players.filter((p) => subwayTeams.includes(p.team));
+  if (subwayPlayers.some((p) => !room.pendingSubwayMoves[p.id])) {
     return;
   }
 
@@ -280,8 +288,8 @@ function resolveActionPhaseIfReady(room: RoomState) {
 
   scoreCurrentBusRegions(clone);
 
-  for (const team of subwayTeams) {
-    const submission = room.pendingSubwayMoves[team];
+  for (const p of subwayPlayers) {
+    const submission = room.pendingSubwayMoves[p.id];
     if (submission) {
       appendSubwayLogAction(actionDetails, clone, submission);
     }

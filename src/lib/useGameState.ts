@@ -43,7 +43,7 @@ export type PublicStateResult = {
     room: BusType;
     roomIndex: number;
   }[]>>;
-  pendingSubwayMoves?: Partial<Record<Colour, boolean>>;
+  pendingSubwayMoves?: Record<string, boolean>;
 } & TimingState;
 
 export type PrivateStateResult = {
@@ -225,6 +225,23 @@ export async function adminSetPlayerColour(
   if (!res.ok) {
     throw new Error(
       await getResponseErrorMessage(res, "Failed to set player colour")
+    );
+  }
+}
+export async function adminUpdatePlayerName(
+  roomCode: string,
+  playerId: string,
+  name: string
+) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "update_player_name", playerId, name }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to update player name")
     );
   }
 }

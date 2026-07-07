@@ -84,8 +84,7 @@ function getRoomOrderedPlayers(game: GameState, busType: BusType) {
   }
 
   const roundColourOrder = getRoundColourOrder(game.roundIndex);
-  const roomColours =
-    busType === BusType.BUS1 ? roundColourOrder : [...roundColourOrder].reverse();
+  const roomColours = roundColourOrder;
 
   return roomColours
     .flatMap((colour) => {

@@ -22,7 +22,9 @@ export function buildPublicState(record: RoomRecord) {
   const subwayMoveTeams = getSubwayMoveTeams(room.game);
   const subwayTeamPlayers = getSubwayTeamPlayerOptions(room.game);
   const pendingSubwayMoves = Object.fromEntries(
-    subwayMoveTeams.map((team) => [team, !!room.pendingSubwayMoves?.[team]])
+    room.game.players
+      .filter((p) => subwayMoveTeams.includes(p.team))
+      .map((p) => [p.id, !!room.pendingSubwayMoves?.[p.id]])
   );
 
   return {
@@ -94,8 +96,10 @@ function getActivePlayerNames(room: RoomState): string | null {
       names.push(`${bus2Player.name}(BUS2)`);
     }
     for (const team of getSubwayMoveTeams(room.game)) {
-      if (!room.pendingSubwayMoves?.[team]) {
-        names.push(`${team}팀(지하철)`);
+      const teamPlayers = room.game.players.filter((p) => p.team === team);
+      const pendingCount = teamPlayers.filter((p) => !room.pendingSubwayMoves?.[p.id]).length;
+      if (pendingCount > 0) {
+        names.push(`${team}팀(${pendingCount}명 대기)`);
       }
     }
   } else if (room.status === "ACTION_PHASE") {
@@ -110,8 +114,10 @@ function getActivePlayerNames(room: RoomState): string | null {
       names.push(`${bus2Player.name}(BUS2)`);
     }
     for (const team of getSubwayMoveTeams(room.game)) {
-      if (!room.pendingSubwayMoves?.[team]) {
-        names.push(`${team}팀(지하철)`);
+      const teamPlayers = room.game.players.filter((p) => p.team === team);
+      const pendingCount = teamPlayers.filter((p) => !room.pendingSubwayMoves?.[p.id]).length;
+      if (pendingCount > 0) {
+        names.push(`${team}팀(${pendingCount}명 대기)`);
       }
     }
   }

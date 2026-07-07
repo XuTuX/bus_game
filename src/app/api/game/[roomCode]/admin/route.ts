@@ -4,6 +4,7 @@ import {
   adminRemoveParticipant,
   adminSetRoomTimers,
   adminSetParticipantColour,
+  adminUpdateParticipantName,
   adminStartGame,
   adminStartRoomTimer,
   adminStartTurn,
@@ -23,6 +24,7 @@ export async function POST(
         | "add_player"
         | "remove_player"
         | "set_player_colour"
+        | "update_player_name"
         | "set_timers"
         | "start_game"
         | "start"
@@ -43,6 +45,12 @@ export async function POST(
         roomCode,
         String(body.playerId ?? ""),
         body.colour as Colour
+      );
+    } else if (action === "update_player_name") {
+      await adminUpdateParticipantName(
+        roomCode,
+        String(body.playerId ?? ""),
+        String(body.name ?? "")
       );
     } else if (action === "set_timers") {
       await adminSetRoomTimers(roomCode, {

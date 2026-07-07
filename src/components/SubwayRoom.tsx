@@ -83,7 +83,6 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
     [publicState?.pendingSubwayMoves]
   );
 
-  const [selectedSubway, setSelectedSubway] = useState<BusType>(BusType.BUS1);
   const [selectedTeam, setSelectedTeam] = useState<Colour | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedKind, setSelectedKind] = useState<CardKind | null>(null);
@@ -93,16 +92,23 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   const selectedTeamPlayers = selectedTeam ? subwayTeamPlayers[selectedTeam] ?? [] : [];
   const selectedPrivateState = usePrivateGame(roomCode, selectedPlayerId);
   const hand = selectedPrivateState?.hand ?? [];
-  const isSelectedTeamSubmitted = selectedTeam
-    ? !!pendingSubwayMoves[selectedTeam]
+
+  const selectedSubway = useMemo(() => {
+    const activePlayerOption = selectedTeamPlayers.find((p) => p.playerId === selectedPlayerId);
+    return activePlayerOption ? activePlayerOption.room : BusType.BUS1;
+  }, [selectedTeamPlayers, selectedPlayerId]);
+
+  const isSelectedPlayerSubmitted = selectedPlayerId
+    ? !!pendingSubwayMoves[selectedPlayerId]
     : false;
+
   const canSubwaySubmitPhase =
     publicState?.status === "CHOOSING" || publicState?.status === "ACTION_PHASE";
   const canSubmit =
     canSubwaySubmitPhase &&
     !!selectedTeam &&
     subwayTeams.includes(selectedTeam) &&
-    !isSelectedTeamSubmitted &&
+    !isSelectedPlayerSubmitted &&
     !!selectedPlayerId &&
     !submitting;
 
@@ -215,27 +221,10 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
           <section className="dealer-panel dealer-hand-pane">
             <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
               <h2 className="brand-font">지하철 입력</h2>
-              <span>팀당 카드 최대 1장</span>
+              <span>개인당 카드 최대 1장</span>
             </div>
 
             {errorMsg && <div className="error-box">{errorMsg}</div>}
-
-            <div style={{ marginBottom: 18 }}>
-              <label className="subway-control-label">움직일 지하철</label>
-              <div className="tile-action-options">
-                {([BusType.BUS1, BusType.BUS2] as const).map((subway) => (
-                  <button
-                    key={subway}
-                    type="button"
-                    className={`tile-action-btn ${selectedSubway === subway ? "tile-action-btn-active" : ""}`}
-                    onClick={() => setSelectedSubway(subway)}
-                    disabled={submitting}
-                  >
-                    {subway === BusType.BUS1 ? "1호선" : "2호선"}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div style={{ marginBottom: 18 }}>
               <label className="subway-control-label">제출 팀</label>
@@ -247,7 +236,11 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                   </div>
                 ) : (
                   subwayTeams.map((team) => {
-                    const submitted = !!pendingSubwayMoves[team];
+                    const teamPlayers = subwayTeamPlayers[team] ?? [];
+                    const submittedCount = teamPlayers.filter((p) => pendingSubwayMoves[p.playerId]).length;
+                    const statusText = submittedCount === teamPlayers.length ? "완료" : `${submittedCount}/${teamPlayers.length} 제출`;
+                    const isAllSubmitted = submittedCount === teamPlayers.length;
+
                     return (
                       <button
                         key={team}
@@ -262,7 +255,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                       >
                         <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
                         <strong>{team}</strong>
-                        <span>{submitted ? "제출 완료" : "입력 대기"}</span>
+                        <span>{isAllSubmitted ? "제출 완료" : statusText}</span>
                       </button>
                     );
                   })
@@ -274,20 +267,23 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
               <div style={{ marginBottom: 18 }}>
                 <label className="subway-control-label">제출 플레이어</label>
                 <div className="tile-action-options">
-                  {selectedTeamPlayers.map((player) => (
-                    <button
-                      key={player.playerId}
-                      type="button"
-                      className={`tile-action-btn ${selectedPlayerId === player.playerId ? "tile-action-btn-active" : ""}`}
-                      onClick={() => setSelectedPlayerId(player.playerId)}
-                      disabled={submitting || isSelectedTeamSubmitted}
-                    >
-                      <strong>{player.playerName ?? player.playerId}</strong>
-                      <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
-                        {player.room === BusType.BUS1 ? "버스 1방" : "버스 2방"} · {player.roomIndex}번
-                      </span>
-                    </button>
-                  ))}
+                  {selectedTeamPlayers.map((player) => {
+                    const submitted = !!pendingSubwayMoves[player.playerId];
+                    return (
+                      <button
+                        key={player.playerId}
+                        type="button"
+                        className={`tile-action-btn ${selectedPlayerId === player.playerId ? "tile-action-btn-active" : ""}`}
+                        onClick={() => setSelectedPlayerId(player.playerId)}
+                        disabled={submitting || submitted}
+                      >
+                        <strong>{player.playerName ?? player.playerId}</strong>
+                        <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
+                          {player.room === BusType.BUS1 ? "버스 1방" : "버스 2방"} · {player.roomIndex}번 {submitted ? "(제출 완료)" : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -297,10 +293,10 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                 <h3 className="brand-font">{STATUS_TEXT[publicState.status] ?? "대기 중"}</h3>
                 <p>이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다.</p>
               </div>
-            ) : isSelectedTeamSubmitted ? (
+            ) : isSelectedPlayerSubmitted ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">제출 완료</h3>
-                <p>{selectedTeam}팀의 지하철 입력이 이미 접수되었습니다.</p>
+                <p>선택하신 플레이어의 지하철 입력이 이미 접수되었습니다.</p>
               </div>
             ) : (
               <>

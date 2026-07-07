@@ -149,6 +149,23 @@ export async function adminSetParticipantColour(
   });
 }
 
+export async function adminUpdateParticipantName(
+  roomCode: string,
+  playerId: string,
+  name: string
+): Promise<void> {
+  await mutateRoom(roomCode, (room) => {
+    if (room.status !== "LOBBY") {
+      throw new Error("게임 시작 후에는 이름을 바꿀 수 없습니다.");
+    }
+    const participant = room.participants.find((p) => p.id === playerId);
+    if (!participant) {
+      throw new Error("참가자를 찾을 수 없습니다.");
+    }
+    participant.name = name.trim().slice(0, 16);
+  });
+}
+
 export async function adminSetRoomTimers(
   roomCode: string,
   settings: Partial<RoomTimerSettings>
@@ -206,6 +223,10 @@ export async function adminStartGame(roomCode: string): Promise<void> {
     const missingColour = room.participants.find((participant) => !participant.colour);
     if (missingColour) {
       throw new Error("참가자 색상 자동 배정에 실패했습니다.");
+    }
+    const missingName = room.participants.find((p) => !p.name.trim());
+    if (missingName) {
+      throw new Error("모든 참가자의 이름을 입력해야 게임을 시작할 수 있습니다.");
     }
 
     room.game = createGame(
@@ -280,14 +301,37 @@ function addLobbyParticipant(room: RoomState, name: string): LobbyParticipant {
   return participant;
 }
 
+const COLOUR_KOREAN: Record<Colour, string> = {
+  [Colour.Red]: "레드",
+  [Colour.Orange]: "오렌지",
+  [Colour.Yellow]: "옐로",
+  [Colour.Green]: "그린",
+  [Colour.Blue]: "블루",
+};
+
 function createEmptyRoom(): RoomState {
+  const participants: LobbyParticipant[] = [];
+  let idCounter = 0;
+  for (const colour of COLOURS) {
+    participants.push({
+      id: `P${++idCounter}`,
+      name: "",
+      colour,
+    });
+    participants.push({
+      id: `P${++idCounter}`,
+      name: "",
+      colour,
+    });
+  }
+
   return {
     game: createGame(Math.random, []),
-    participants: [],
+    participants,
     logs: [],
     status: "LOBBY",
     logIdCounter: 0,
-    playerIdCounter: 0,
+    playerIdCounter: idCounter,
     pendingMoves: {},
     pendingSubwayMoves: {},
     pendingActions: {},

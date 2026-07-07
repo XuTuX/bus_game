@@ -24,6 +24,8 @@ const DEFAULT_TEAM_LABELS: Record<Colour, string> = {
   Blue: "Blue",
 };
 
+import { useState, useEffect } from "react";
+
 type PlayerRoomOrderProps = {
   activePlayerNames?: string | null;
   emptyText: string;
@@ -34,6 +36,7 @@ type PlayerRoomOrderProps = {
   rowClassName?: string;
   status: RoomStatus;
   teamLabels?: Record<Colour, string>;
+  onNameSave?: (playerId: string, name: string) => void;
 };
 
 type OrderSource = {
@@ -49,6 +52,48 @@ type RoomOrderEntry = OrderSource & {
   roomIndex: number;
 };
 
+function LobbyPlayerNameInput({
+  participant,
+  onSave,
+  placeholder,
+}: {
+  participant: LobbyParticipant;
+  onSave: (playerId: string, name: string) => void;
+  placeholder?: string;
+}) {
+  const [value, setValue] = useState(participant.name);
+
+  useEffect(() => {
+    setValue(participant.name);
+  }, [participant.name]);
+
+  return (
+    <input
+      type="text"
+      className="player-name-input"
+      value={value}
+      maxLength={16}
+      placeholder={placeholder}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => {
+        if (value.trim() !== participant.name) {
+          onSave(participant.id, value.trim());
+        }
+      }}
+      style={{
+        background: "white",
+        border: "1px solid var(--border-light)",
+        borderRadius: "6px",
+        padding: "4px 8px",
+        fontSize: "0.95rem",
+        fontWeight: "bold",
+        width: "140px",
+        color: "var(--text-primary)",
+      }}
+    />
+  );
+}
+
 export default function PlayerRoomOrder({
   activePlayerNames,
   emptyText,
@@ -59,6 +104,7 @@ export default function PlayerRoomOrder({
   rowClassName,
   status,
   teamLabels = DEFAULT_TEAM_LABELS,
+  onNameSave,
 }: PlayerRoomOrderProps) {
   if (participants.length === 0) {
     return <div className="empty-state">{emptyText}</div>;
@@ -73,21 +119,25 @@ export default function PlayerRoomOrder({
     <div className="player-room-order">
       <RoomSection
         activePlayerNames={activePlayerNames}
-        busType={BusType.BUS1}
-        entries={bus1Entries}
-        renderActions={renderActions}
-        renderColourPicker={renderColourPicker}
-        rowClassName={rowClassName}
-        teamLabels={teamLabels}
-      />
-      <RoomSection
-        activePlayerNames={activePlayerNames}
         busType={BusType.BUS2}
         entries={bus2Entries}
         renderActions={renderActions}
         renderColourPicker={renderColourPicker}
         rowClassName={rowClassName}
         teamLabels={teamLabels}
+        status={status}
+        onNameSave={onNameSave}
+      />
+      <RoomSection
+        activePlayerNames={activePlayerNames}
+        busType={BusType.BUS1}
+        entries={bus1Entries}
+        renderActions={renderActions}
+        renderColourPicker={renderColourPicker}
+        rowClassName={rowClassName}
+        teamLabels={teamLabels}
+        status={status}
+        onNameSave={onNameSave}
       />
     </div>
   );
@@ -101,6 +151,8 @@ function RoomSection({
   renderColourPicker,
   rowClassName,
   teamLabels,
+  status,
+  onNameSave,
 }: {
   activePlayerNames?: string | null;
   busType: BusType;
@@ -109,6 +161,8 @@ function RoomSection({
   renderColourPicker?: (participant: LobbyParticipant) => ReactNode;
   rowClassName?: string;
   teamLabels: Record<Colour, string>;
+  status: RoomStatus;
+  onNameSave?: (playerId: string, name: string) => void;
 }) {
   const roomName = busType === BusType.BUS1 ? "버스 1 방" : "버스 2 방";
   const roomSymbol = busType === BusType.BUS1 ? "1" : "2";
@@ -144,7 +198,15 @@ function RoomSection({
                   }}
                 />
                 <div>
-                  <strong>{entry.name}</strong>
+                  {status === "LOBBY" && participant && onNameSave ? (
+                    <LobbyPlayerNameInput
+                      participant={participant}
+                      onSave={onNameSave}
+                      placeholder={`${entry.colour ? teamLabels[entry.colour] : ""} ${entry.roomIndex}번 이름`}
+                    />
+                  ) : (
+                    <strong>{entry.name || `${entry.colour ? teamLabels[entry.colour] : ""} ${entry.roomIndex}번`}</strong>
+                  )}
                   <small>{entry.colour ? teamLabels[entry.colour] : "색상 미배정"}</small>
                 </div>
               </div>
@@ -197,8 +259,7 @@ function buildRoomEntries(
     }
   }
 
-  const roomColours =
-    busType === BusType.BUS1 ? roundColourOrder : [...roundColourOrder].reverse();
+  const roomColours = roundColourOrder;
 
   return roomColours.flatMap((colour) => {
     const players = grouped.get(colour) ?? [];

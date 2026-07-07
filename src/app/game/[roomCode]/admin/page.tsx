@@ -9,10 +9,8 @@ import ScoreBoard from "@/components/ScoreBoard";
 import ActionLog from "@/components/ActionLog";
 import {
   adminAction,
-  adminAddPlayer,
-  adminRemovePlayer,
   adminSetTimers,
-  adminSetPlayerColour,
+  adminUpdatePlayerName,
   usePhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
@@ -50,7 +48,6 @@ export default function AdminPage({
   const { roomCode } = use(params);
   const state = usePublicGame(roomCode);
   const phaseTimeLabel = usePhaseTimeLabel(state);
-  const [playerName, setPlayerName] = useState("");
   const [editingPlayers, setEditingPlayers] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
   const [savingTimers, setSavingTimers] = useState(false);
@@ -129,47 +126,11 @@ export default function AdminPage({
     }
   };
 
-  const handleAddPlayer = async (event: FormEvent) => {
-    event.preventDefault();
-    if (editingPlayers || participants.length >= MAX_PLAYERS) return;
-
-    setEditingPlayers(true);
-    setErrorMsg("");
+  const handleUpdatePlayerName = async (playerId: string, name: string) => {
     try {
-      await adminAddPlayer(roomCode, playerName);
-      setPlayerName("");
+      await adminUpdatePlayerName(roomCode, playerId, name);
     } catch (error: any) {
-      setErrorMsg(error.message || "참가자 추가에 실패했습니다.");
-    } finally {
-      setEditingPlayers(false);
-    }
-  };
-
-  const handleRemovePlayer = async (playerId: string) => {
-    if (editingPlayers) return;
-
-    setEditingPlayers(true);
-    setErrorMsg("");
-    try {
-      await adminRemovePlayer(roomCode, playerId);
-    } catch (error: any) {
-      setErrorMsg(error.message || "참가자 삭제에 실패했습니다.");
-    } finally {
-      setEditingPlayers(false);
-    }
-  };
-
-  const handleSetColour = async (playerId: string, colour: Colour) => {
-    if (editingPlayers) return;
-
-    setEditingPlayers(true);
-    setErrorMsg("");
-    try {
-      await adminSetPlayerColour(roomCode, playerId, colour);
-    } catch (error: any) {
-      setErrorMsg(error.message || "색상 변경에 실패했습니다.");
-    } finally {
-      setEditingPlayers(false);
+      setErrorMsg(error.message || "이름 변경에 실패했습니다.");
     }
   };
 
@@ -287,38 +248,19 @@ export default function AdminPage({
 
           {status === "LOBBY" && (
             <div className="master-section">
-              <h2 className="brand-font">사람 입력</h2>
+              <h2 className="brand-font">이름 입력 완료 후 게임 시작</h2>
               <p className="section-copy">
-                참가자 이름을 실제 플레이 순서대로 입력하세요. 색상은 아래 참가자 목록에서 바꿀 수 있습니다.
+                참가자 10명의 이름을 모두 입력한 후 아래 버튼을 눌러 게임을 시작하세요.
               </p>
-
-              <form onSubmit={handleAddPlayer} className="player-add-form">
-                <input
-                  value={playerName}
-                  onChange={(event) => setPlayerName(event.target.value)}
-                  placeholder={`참가자 이름 (${participants.length}/${MAX_PLAYERS})`}
-                  maxLength={16}
-                  disabled={editingPlayers || participants.length >= MAX_PLAYERS}
-                />
-                <button
-                  className="btn btn-primary"
-                  disabled={editingPlayers || participants.length >= MAX_PLAYERS}
-                  type="submit"
-                >
-                  추가
-                </button>
-              </form>
 
               <button
                 className="btn btn-primary master-action"
-                disabled={!canStartGame || busyAction}
+                disabled={busyAction}
                 onClick={() => runAdminAction("start_game")}
+                style={{ width: "100%", marginTop: 12 }}
               >
                 게임 시작
               </button>
-              {!canStartGame && (
-                <p className="muted-copy">게임 시작 전 참가자를 1명 이상 입력해야 합니다.</p>
-              )}
             </div>
           )}
 
@@ -377,38 +319,7 @@ export default function AdminPage({
             rowClassName="admin-player-row"
             status={status}
             teamLabels={TEAM_LABELS}
-            renderColourPicker={(participant) =>
-              status === "LOBBY" ? (
-                <div className="colour-picker" aria-label={`${participant.name} 색상 선택`}>
-                  {COLOURS.map((colour) => (
-                    <button
-                      key={colour}
-                      className={`colour-swatch ${
-                        participant.colour === colour ? "colour-swatch-active" : ""
-                      }`}
-                      style={{ background: TEAM_COLOUR_VARS[colour] }}
-                      title={TEAM_LABELS[colour]}
-                      aria-label={TEAM_LABELS[colour]}
-                      disabled={editingPlayers}
-                      onClick={() => handleSetColour(participant.id, colour)}
-                    />
-                  ))}
-                </div>
-              ) : null
-            }
-            renderActions={(participant) =>
-              status === "LOBBY" ? (
-                <div className="player-row-actions">
-                  <button
-                    className="btn btn-ghost compact-btn danger-btn"
-                    disabled={editingPlayers}
-                    onClick={() => handleRemovePlayer(participant.id)}
-                  >
-                    삭제
-                  </button>
-                </div>
-              ) : null
-            }
+            onNameSave={handleUpdatePlayerName}
           />
           {status !== "LOBBY" && (
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>

@@ -53,7 +53,7 @@ export interface RoomState {
     BUS1?: MoveTurnAction[];
     BUS2?: MoveTurnAction[];
   };
-  pendingSubwayMoves: Partial<Record<Colour, SubwayMoveSubmission>>;
+  pendingSubwayMoves: Record<string, SubwayMoveSubmission>;
   pendingActions: {
     BUS1?: ActionPhaseTurnAction | null;
     BUS2?: ActionPhaseTurnAction | null;
