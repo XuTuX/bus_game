@@ -195,22 +195,22 @@ export default function AdminPage({
           {status !== "LOBBY" && (
             <>
               <Link
-                href={`/dealer/${roomCode}/plus`}
+                href={`/dealer/${roomCode}/bus1`}
                 className="btn btn-primary"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ background: "var(--bus-plus)", borderColor: "var(--bus-plus)" }}
+                style={{ background: "var(--bus1-color)", borderColor: "var(--bus1-color)" }}
               >
-                PLUS 딜러룸 열기
+                버스 1 딜러룸 열기
               </Link>
               <Link
-                href={`/dealer/${roomCode}/minus`}
+                href={`/dealer/${roomCode}/bus2`}
                 className="btn btn-primary"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ background: "var(--bus-minus)", borderColor: "var(--bus-minus)" }}
+                style={{ background: "var(--bus2-color)", borderColor: "var(--bus2-color)" }}
               >
-                MINUS 딜러룸 열기
+                버스 2 딜러룸 열기
               </Link>
             </>
           )}

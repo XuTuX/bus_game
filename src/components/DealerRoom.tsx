@@ -16,6 +16,7 @@ import {
   stepCoord,
   wallConflicts,
   type GameState,
+  getRoundColourOrder,
 } from "@/lib/game";
 import {
   submitAction,
@@ -92,15 +93,14 @@ export default function DealerRoom({
   let resolvedPlayerId = playerId || "";
 
   if (roomBus && initialGame && publicState?.status !== "LOBBY") {
-    const plusTeam = COLOURS[initialGame.turnIndex];
-    const minusTeam = COLOURS[COLOURS.length - 1 - initialGame.turnIndex];
-    const plusTeamPlayers = initialGame.players.filter((p) => p.team === plusTeam);
-    const minusTeamPlayers = initialGame.players.filter((p) => p.team === minusTeam);
-    const plusPlayer = plusTeamPlayers[0];
-    const minusPlayer = minusTeamPlayers[1] || minusTeamPlayers[0];
+    const roundColourOrder = getRoundColourOrder(initialGame.roundIndex);
+    const bus1Team = roundColourOrder[initialGame.turnIndex];
+    const bus1TeamPlayers = initialGame.players.filter((p) => p.team === bus1Team);
+    const bus1Player = bus1TeamPlayers[0];
+    const bus2Player = bus1TeamPlayers[1] || bus1TeamPlayers[0];
 
     resolvedPlayerId =
-      roomBus === BusType.BUS1 ? plusPlayer?.id || "" : minusPlayer?.id || "";
+      roomBus === BusType.BUS1 ? bus1Player?.id || "" : bus2Player?.id || "";
   }
 
   const privateState = usePrivateGame(roomCode, resolvedPlayerId);
@@ -122,45 +122,45 @@ export default function DealerRoom({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const isPlusController = privateState?.isPlusController ?? false;
-  const isMinusController = privateState?.isMinusController ?? false;
-  const isPlusSubmitted = publicState?.pendingMoves?.PLUS ?? false;
-  const isMinusSubmitted = publicState?.pendingMoves?.MINUS ?? false;
-  const isPlusActionSubmitted = publicState?.pendingActions?.PLUS ?? false;
-  const isMinusActionSubmitted = publicState?.pendingActions?.MINUS ?? false;
+  const isBus1Controller = privateState?.isBus1Controller ?? false;
+  const isBus2Controller = privateState?.isBus2Controller ?? false;
+  const isBus1Submitted = publicState?.pendingMoves?.BUS1 ?? false;
+  const isBus2Submitted = publicState?.pendingMoves?.BUS2 ?? false;
+  const isBus1ActionSubmitted = publicState?.pendingActions?.BUS1 ?? false;
+  const isBus2ActionSubmitted = publicState?.pendingActions?.BUS2 ?? false;
   const selectedBus = roomBus ?? chosenBus;
   const isSelectedBusController =
-    selectedBus === BusType.BUS1 ? isPlusController : isMinusController;
+    selectedBus === BusType.BUS1 ? isBus1Controller : isBus2Controller;
   const isSelectedMoveSubmitted =
-    selectedBus === BusType.BUS1 ? isPlusSubmitted : isMinusSubmitted;
+    selectedBus === BusType.BUS1 ? isBus1Submitted : isBus2Submitted;
   const isSelectedActionSubmitted =
-    selectedBus === BusType.BUS1 ? isPlusActionSubmitted : isMinusActionSubmitted;
+    selectedBus === BusType.BUS1 ? isBus1ActionSubmitted : isBus2ActionSubmitted;
 
   // Auto-lock chosenBus based on role authority
   useEffect(() => {
     if (roomBus) {
       setChosenBus(roomBus);
-    } else if (isPlusController && !isMinusController) {
+    } else if (isBus1Controller && !isBus2Controller) {
       setChosenBus(BusType.BUS1);
-    } else if (isMinusController && !isPlusController) {
+    } else if (isBus2Controller && !isBus1Controller) {
       setChosenBus(BusType.BUS2);
-    } else if (isPlusController && isMinusController) {
+    } else if (isBus1Controller && isBus2Controller) {
       if (publicState?.status === "CHOOSING") {
-        setChosenBus(isPlusSubmitted && !isMinusSubmitted ? BusType.BUS2 : BusType.BUS1);
+        setChosenBus(isBus1Submitted && !isBus2Submitted ? BusType.BUS2 : BusType.BUS1);
       } else if (publicState?.status === "ACTION_PHASE") {
         setChosenBus(
-          isPlusActionSubmitted && !isMinusActionSubmitted ? BusType.BUS2 : BusType.BUS1
+          isBus1ActionSubmitted && !isBus2ActionSubmitted ? BusType.BUS2 : BusType.BUS1
         );
       }
     }
   }, [
     roomBus,
-    isPlusController,
-    isMinusController,
-    isPlusSubmitted,
-    isMinusSubmitted,
-    isPlusActionSubmitted,
-    isMinusActionSubmitted,
+    isBus1Controller,
+    isBus2Controller,
+    isBus1Submitted,
+    isBus2Submitted,
+    isBus1ActionSubmitted,
+    isBus2ActionSubmitted,
     publicState?.status,
   ]);
 
@@ -196,31 +196,31 @@ export default function DealerRoom({
   // Check if I have already submitted my moves/action for this turn
   const hasISubmittedMoves = roomBus
     ? isSelectedBusController && isSelectedMoveSubmitted
-    : ((isPlusController && isPlusSubmitted) || !isPlusController) &&
-      ((isMinusController && isMinusSubmitted) || !isMinusController) &&
-      (isPlusController || isMinusController);
+    : ((isBus1Controller && isBus1Submitted) || !isBus1Controller) &&
+      ((isBus2Controller && isBus2Submitted) || !isBus2Controller) &&
+      (isBus1Controller || isBus2Controller);
 
   const hasISubmittedAction = roomBus
     ? isSelectedBusController && isSelectedActionSubmitted
-    : ((isPlusController && isPlusActionSubmitted) || !isPlusController) &&
-      ((isMinusController && isMinusActionSubmitted) || !isMinusController) &&
-      (isPlusController || isMinusController);
+    : ((isBus1Controller && isBus1ActionSubmitted) || !isBus1Controller) &&
+      ((isBus2Controller && isBus2ActionSubmitted) || !isBus2Controller) &&
+      (isBus1Controller || isBus2Controller);
 
   const canAct =
     privateState?.isMyTurn &&
     isSelectedBusController &&
     ((status === "CHOOSING" && !isSelectedMoveSubmitted) ||
       (status === "ACTION_PHASE" && !isSelectedActionSubmitted));
-  const plusBusDisabled =
+  const bus1Disabled =
     !!roomBus ||
     submitting ||
-    (isMinusController && !isPlusController) ||
-    (isPlusController && isMinusController && isPlusSubmitted);
-  const minusBusDisabled =
+    (isBus2Controller && !isBus1Controller) ||
+    (isBus1Controller && isBus2Controller && isBus1Submitted);
+  const bus2Disabled =
     !!roomBus ||
     submitting ||
-    (isPlusController && !isMinusController) ||
-    (isPlusController && isMinusController && (!isPlusSubmitted || isMinusSubmitted));
+    (isBus1Controller && !isBus2Controller) ||
+    (isBus1Controller && isBus2Controller && (!isBus1Submitted || isBus2Submitted));
 
   // Group hand cards and calculate remaining unused counts
   const getCardCount = (kind: CardKind) => {
@@ -237,15 +237,15 @@ export default function DealerRoom({
 
   const activeBusType =
     roomBus ??
-    (status === "ACTION_PHASE" && isPlusController && !isMinusController
+    (status === "ACTION_PHASE" && isBus1Controller && !isBus2Controller
       ? BusType.BUS1
-      : status === "ACTION_PHASE" && isMinusController && !isPlusController
+      : status === "ACTION_PHASE" && isBus2Controller && !isBus1Controller
         ? BusType.BUS2
         : chosenBus);
   const displayGame =
     animatedGame || (status === "CHOOSING" ? submittedPreviewGame : null) || game;
   const activeBusPos = displayGame.buses[activeBusType].pos;
-  const roomBusLabel = selectedBus === BusType.BUS1 ? "PLUS" : "MINUS";
+  const roomBusLabel = selectedBus === BusType.BUS1 ? "버스 1" : "버스 2";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
   // Generate 3x3 cells centered at the active bus position
@@ -377,9 +377,9 @@ export default function DealerRoom({
   // Role subtitle text
   const getRoleSubtitle = () => {
     if (roomBus) return `(${roomBusLabel} 버스 전용 방)`;
-    if (isPlusController && isMinusController) return "(PLUS & MINUS 버스 제어)";
-    if (isPlusController) return "(PLUS 버스 제어)";
-    if (isMinusController) return "(MINUS 버스 제어)";
+    if (isBus1Controller && isBus2Controller) return "(버스 1 & 버스 2 제어)";
+    if (isBus1Controller) return "(버스 1 제어)";
+    if (isBus2Controller) return "(버스 2 제어)";
     return "(대기 중)";
   };
 
@@ -403,7 +403,7 @@ export default function DealerRoom({
           <div className="dealer-pane-heading">
             <h2 className="brand-font">보드판</h2>
             {animatedGame ? (
-              <span style={{ color: "var(--bus-plus)", fontWeight: "bold", animation: "pulse 1.2s infinite" }}>
+              <span style={{ color: "var(--bus1-color)", fontWeight: "bold", animation: "pulse 1.2s infinite" }}>
                 🚌 버스 이동 장면 애니메이션 중...
               </span>
             ) : (
@@ -444,20 +444,20 @@ export default function DealerRoom({
               </div>
             ) : status === "CHOOSING" && hasISubmittedMoves ? (
               <div className="dealer-wait-card">
-                <h3 className="brand-font" style={{ color: "var(--bus-plus)" }}>이동 제출 완료!</h3>
+                <h3 className="brand-font" style={{ color: "var(--bus1-color)" }}>이동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>상대방 플레이어의 이동 카드 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span>PLUS 버스 제출 상태: {isPlusSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
-                  <span>MINUS 버스 제출 상태: {isMinusSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>버스 1 제출 상태: {isBus1Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>버스 2 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
               </div>
             ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
               <div className="dealer-wait-card">
-                <h3 className="brand-font" style={{ color: "var(--bus-minus)" }}>행동 제출 완료!</h3>
+                <h3 className="brand-font" style={{ color: "var(--bus2-color)" }}>행동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span>PLUS 버스 행동 제출: {isPlusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
-                  <span>MINUS 버스 행동 제출: {isMinusActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>버스 1 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>버스 2 행동 제출: {isBus2ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
               </div>
             ) : !canAct ? (
@@ -478,12 +478,12 @@ export default function DealerRoom({
                         <div
                           className="tile-action-btn tile-action-btn-active"
                           style={{
-                            background: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
-                            borderColor: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
+                            background: activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
+                            borderColor: activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
                             color: "white",
                           }}
                         >
-                          {activeBusType === BusType.BUS1 ? "＋ PLUS 버스 전용" : "ー MINUS 버스 전용"}
+                          {activeBusType === BusType.BUS1 ? "🚌 버스 1 전용" : "🚌 버스 2 전용"}
                         </div>
                       </div>
                     ) : (
@@ -496,27 +496,27 @@ export default function DealerRoom({
                             type="button"
                             className={`tile-action-btn ${chosenBus === BusType.BUS1 ? "tile-action-btn-active" : ""}`}
                             style={{
-                              background: chosenBus === BusType.BUS1 ? "var(--bus-plus)" : undefined,
-                              borderColor: chosenBus === BusType.BUS1 ? "var(--bus-plus)" : undefined,
+                              background: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
+                              borderColor: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
                               color: chosenBus === BusType.BUS1 ? "white" : undefined,
                             }}
                             onClick={() => setChosenBus(BusType.BUS1)}
-                            disabled={plusBusDisabled}
+                            disabled={bus1Disabled}
                           >
-                            ＋ PLUS 버스
+                            🚌 버스 1
                           </button>
                           <button
                             type="button"
                             className={`tile-action-btn ${chosenBus === BusType.BUS2 ? "tile-action-btn-active" : ""}`}
                             style={{
-                              background: chosenBus === BusType.BUS2 ? "var(--bus-minus)" : undefined,
-                              borderColor: chosenBus === BusType.BUS2 ? "var(--bus-minus)" : undefined,
+                              background: chosenBus === BusType.BUS2 ? "var(--bus2-color)" : undefined,
+                              borderColor: chosenBus === BusType.BUS2 ? "var(--bus2-color)" : undefined,
                               color: chosenBus === BusType.BUS2 ? "white" : undefined,
                             }}
                             onClick={() => setChosenBus(BusType.BUS2)}
-                            disabled={minusBusDisabled}
+                            disabled={bus2Disabled}
                           >
-                            ー MINUS 버스
+                            🚌 버스 2
                           </button>
                         </div>
                       </div>
@@ -601,8 +601,8 @@ export default function DealerRoom({
                             key={i}
                             className="selected-chip"
                             style={{
-                              background: activeBusType === BusType.BUS1 ? "var(--bus-plus)" : "var(--bus-minus)",
-                              boxShadow: activeBusType === BusType.BUS1 ? "var(--shadow-glow-plus)" : "var(--shadow-glow-minus)",
+                              background: activeBusType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
+                              boxShadow: activeBusType === BusType.BUS1 ? "var(--shadow-glow-bus1)" : "var(--shadow-glow-bus2)",
                             }}
                           >
                             <span>
@@ -641,7 +641,7 @@ export default function DealerRoom({
                       <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 2: 행동 선택</h3>
                     </div>
                     <p className="dealer-subtitle" style={{ marginBottom: 16 }}>
-                      이동이 적용되었습니다. <strong>{activeBusType === BusType.BUS1 ? "PLUS" : "MINUS"} 버스</strong> 위치 (
+                      이동이 적용되었습니다. <strong>{activeBusType === BusType.BUS1 ? "버스 1" : "버스 2"} 버스</strong> 위치 (
                       {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
                     </p>
 

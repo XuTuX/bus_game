@@ -66,15 +66,15 @@ export default function PlayerRoomOrder({
 
   const sources = getOrderSources(status, participants, game);
   const roundColourOrder = getRoundColourOrder(game.roundIndex);
-  const plusEntries = buildRoomEntries(sources, BusType.BUS1, roundColourOrder);
-  const minusEntries = buildRoomEntries(sources, BusType.BUS2, roundColourOrder);
+  const bus1Entries = buildRoomEntries(sources, BusType.BUS1, roundColourOrder);
+  const bus2Entries = buildRoomEntries(sources, BusType.BUS2, roundColourOrder);
 
   return (
     <div className="player-room-order">
       <RoomSection
         activePlayerNames={activePlayerNames}
         busType={BusType.BUS1}
-        entries={plusEntries}
+        entries={bus1Entries}
         renderActions={renderActions}
         renderColourPicker={renderColourPicker}
         rowClassName={rowClassName}
@@ -83,7 +83,7 @@ export default function PlayerRoomOrder({
       <RoomSection
         activePlayerNames={activePlayerNames}
         busType={BusType.BUS2}
-        entries={minusEntries}
+        entries={bus2Entries}
         renderActions={renderActions}
         renderColourPicker={renderColourPicker}
         rowClassName={rowClassName}
@@ -110,8 +110,8 @@ function RoomSection({
   rowClassName?: string;
   teamLabels: Record<Colour, string>;
 }) {
-  const roomName = busType === BusType.BUS1 ? "PLUS 방" : "MINUS 방";
-  const roomSymbol = busType === BusType.BUS1 ? "+" : "-";
+  const roomName = busType === BusType.BUS1 ? "버스 1 방" : "버스 2 방";
+  const roomSymbol = busType === BusType.BUS1 ? "1" : "2";
 
   return (
     <section className={`player-room-section player-room-section-${busType.toLowerCase()}`}>

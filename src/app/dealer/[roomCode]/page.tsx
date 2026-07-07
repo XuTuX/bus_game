@@ -16,26 +16,26 @@ export default async function DealerRoomPage({
 
         <div className="home-actions">
           <section className="home-section">
-            <h2 className="brand-font">PLUS 딜러룸</h2>
-            <p>PLUS 버스 이동 카드와 행동을 제출합니다.</p>
+            <h2 className="brand-font">버스 1 딜러룸</h2>
+            <p>버스 1 이동 카드와 행동을 제출합니다.</p>
             <Link
               className="btn btn-primary"
-              href={`/dealer/${roomCode}/plus`}
-              style={{ background: "var(--bus-plus)", borderColor: "var(--bus-plus)" }}
+              href={`/dealer/${roomCode}/bus1`}
+              style={{ background: "var(--bus1-color)", borderColor: "var(--bus1-color)" }}
             >
-              PLUS 딜러룸 열기
+              버스 1 딜러룸 열기
             </Link>
           </section>
 
           <section className="home-section">
-            <h2 className="brand-font">MINUS 딜러룸</h2>
-            <p>MINUS 버스 이동 카드와 행동을 제출합니다.</p>
+            <h2 className="brand-font">버스 2 딜러룸</h2>
+            <p>버스 2 이동 카드와 행동을 제출합니다.</p>
             <Link
               className="btn btn-primary"
-              href={`/dealer/${roomCode}/minus`}
-              style={{ background: "var(--bus-minus)", borderColor: "var(--bus-minus)" }}
+              href={`/dealer/${roomCode}/bus2`}
+              style={{ background: "var(--bus2-color)", borderColor: "var(--bus2-color)" }}
             >
-              MINUS 딜러룸 열기
+              버스 2 딜러룸 열기
             </Link>
           </section>
         </div>

@@ -86,7 +86,7 @@ export default function ActionLog({ logs }: { logs: LogEntry[] }) {
                       fontSize: "0.8rem",
                       color: action.applied
                         ? "var(--text-primary)"
-                        : "var(--bus-minus)",
+                        : "var(--bus2-color)",
                       marginBottom: 4,
                     }}
                   >
@@ -94,8 +94,8 @@ export default function ActionLog({ logs }: { logs: LogEntry[] }) {
                       style={{
                         color:
                           action.bus === BusType.BUS1
-                            ? "var(--bus-plus)"
-                            : "var(--bus-minus)",
+                            ? "var(--bus1-color)"
+                            : "var(--bus2-color)",
                         fontWeight: "bold",
                       }}
                     >
@@ -108,8 +108,8 @@ export default function ActionLog({ logs }: { logs: LogEntry[] }) {
                         style={{
                           color:
                             action.scoreGained > 0
-                              ? "var(--bus-plus)"
-                              : "var(--bus-minus)",
+                              ? "var(--bus1-color)"
+                              : "var(--bus2-color)",
                           fontWeight: "bold",
                         }}
                       >

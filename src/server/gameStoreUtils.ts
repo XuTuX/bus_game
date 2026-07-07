@@ -5,16 +5,15 @@ import {
 import { type TurnControllers } from "./gameStoreTypes";
 
 export function getTurnControllers(game: GameState): TurnControllers {
-  // 라운드마다 색상 순서를 한 칸씩 밀고, 현재 턴 색상은 BUS1, 반대편 색상은 BUS2 버스를 조작합니다.
+  // 라운드마다 색상 순서를 한 칸씩 밀고, 두 버스 모두 동일한 순서(빨강 -> 주황 -> 노랑 -> 초록 -> 파랑)로 진행되므로 같은 색상 팀이 조작합니다.
   const roundColourOrder = getRoundColourOrder(game.roundIndex);
-  const plusTeamColor = roundColourOrder[game.turnIndex];
-  const minusTeamColor = roundColourOrder[roundColourOrder.length - 1 - game.turnIndex];
-  const plusTeamPlayers = game.players.filter((p) => p.team === plusTeamColor);
-  const minusTeamPlayers = game.players.filter((p) => p.team === minusTeamColor);
+  const bus1TeamColor = roundColourOrder[game.turnIndex];
+  const bus2TeamColor = bus1TeamColor;
+  const bus1TeamPlayers = game.players.filter((p) => p.team === bus1TeamColor);
 
   return {
-    bus1Player: plusTeamPlayers[0],
-    bus2Player: minusTeamPlayers[1] || minusTeamPlayers[0],
+    bus1Player: bus1TeamPlayers[0],
+    bus2Player: bus1TeamPlayers[1] || bus1TeamPlayers[0],
   };
 }
 

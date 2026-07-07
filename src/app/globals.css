@@ -33,10 +33,10 @@
   --team-blue-bg: rgba(116, 185, 255, 0.15);
 
   /* Bus colours */
-  --bus-plus: #00cec9;
-  --bus-plus-glow: rgba(0, 206, 201, 0.5);
-  --bus-minus: #fd79a8;
-  --bus-minus-glow: rgba(253, 121, 168, 0.5);
+  --bus1-color: #00cec9;
+  --bus1-glow: rgba(0, 206, 201, 0.5);
+  --bus2-color: #fd79a8;
+  --bus2-glow: rgba(253, 121, 168, 0.5);
 
   /* Sizing */
   --tile-size: 56px;
@@ -52,8 +52,8 @@
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
-  --shadow-glow-bus1: 0 4px 16px var(--bus-plus-glow);
-  --shadow-glow-bus2: 0 4px 16px var(--bus-minus-glow);
+  --shadow-glow-bus1: 0 4px 16px var(--bus1-glow);
+  --shadow-glow-bus2: 0 4px 16px var(--bus2-glow);
 }
 
 * {
@@ -230,13 +230,13 @@ h1, h2, h3, .brand-font {
 }
 
 .wall-bus1 {
-  stroke: var(--bus-plus);
+  stroke: var(--bus1-color);
   stroke-width: 4;
   stroke-linecap: round;
 }
 
 .wall-bus2 {
-  stroke: var(--bus-minus);
+  stroke: var(--bus2-color);
   stroke-width: 4;
   stroke-linecap: round;
 }
@@ -266,14 +266,14 @@ h1, h2, h3, .brand-font {
 }
 
 .bus-marker-BUS1 {
-  --bus-marker-fill: var(--bus-plus);
+  --bus-marker-fill: var(--bus1-color);
   background: var(--bus-marker-fill);
   color: white;
   box-shadow: var(--shadow-glow-bus1);
 }
 
 .bus-marker-BUS2 {
-  --bus-marker-fill: var(--bus-minus);
+  --bus-marker-fill: var(--bus2-color);
   background: var(--bus-marker-fill);
   color: white;
   box-shadow: var(--shadow-glow-bus2);
@@ -331,8 +331,8 @@ h1, h2, h3, .brand-font {
   font-size: 1.25rem;
   font-weight: 600;
 }
-.score-value-positive { color: var(--bus-plus); }
-.score-value-negative { color: var(--bus-minus); }
+.score-value-positive { color: var(--bus1-color); }
+.score-value-negative { color: var(--bus2-color); }
 .score-value-zero { color: var(--text-muted); }
 
 /* ─── Cards ─── */
@@ -965,12 +965,12 @@ h1, h2, h3, .brand-font {
 
 .bus-choice-bus1 {
   background: rgba(0, 206, 201, 0.12);
-  color: var(--bus-plus);
+  color: var(--bus1-color);
 }
 
 .bus-choice-bus2 {
   background: rgba(253, 121, 168, 0.12);
-  color: var(--bus-minus);
+  color: var(--bus2-color);
 }
 
 .bus-choice-active {
@@ -1045,11 +1045,11 @@ h1, h2, h3, .brand-font {
   color: white;
 }
 .bus-btn-bus1 {
-  background: var(--bus-plus);
+  background: var(--bus1-color);
   box-shadow: var(--shadow-glow-bus1);
 }
 .bus-btn-bus2 {
-  background: var(--bus-minus);
+  background: var(--bus2-color);
   box-shadow: var(--shadow-glow-bus2);
 }
 .bus-btn:hover { transform: scale(1.05); }
@@ -1226,12 +1226,12 @@ h1, h2, h3, .brand-font {
   font-weight: 700;
 }
 
-.player-room-section-plus .player-room-badge {
-  background: var(--bus-plus);
+.player-room-section-bus1 .player-room-badge {
+  background: var(--bus1-color);
 }
 
-.player-room-section-minus .player-room-badge {
-  background: var(--bus-minus);
+.player-room-section-bus2 .player-room-badge {
+  background: var(--bus2-color);
 }
 
 .player-row {

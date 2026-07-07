@@ -100,17 +100,17 @@ function isCurrentPlayerTurn(room: RoomState, playerId?: string) {
   const isBus2Controller = playerId === bus2Player?.id;
 
   if (room.status === "CHOOSING") {
-    const plusNeedsToSubmit = isBus1Controller && !room.pendingMoves.BUS1;
-    const minusNeedsToSubmit = isBus2Controller && !room.pendingMoves.BUS2;
-    return plusNeedsToSubmit || minusNeedsToSubmit;
+    const bus1NeedsToSubmit = isBus1Controller && !room.pendingMoves.BUS1;
+    const bus2NeedsToSubmit = isBus2Controller && !room.pendingMoves.BUS2;
+    return bus1NeedsToSubmit || bus2NeedsToSubmit;
   }
 
   if (room.status === "ACTION_PHASE") {
-    const plusNeedsToSubmit =
+    const bus1NeedsToSubmit =
       isBus1Controller && room.pendingActions.BUS1 === undefined;
-    const minusNeedsToSubmit =
+    const bus2NeedsToSubmit =
       isBus2Controller && room.pendingActions.BUS2 === undefined;
-    return plusNeedsToSubmit || minusNeedsToSubmit;
+    return bus1NeedsToSubmit || bus2NeedsToSubmit;
   }
 
   return false;

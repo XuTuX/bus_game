@@ -27,12 +27,12 @@ export type PublicStateResult = {
   status: RoomState["status"];
   activePlayerNames: string | null;
   pendingMoves?: {
-    PLUS: boolean;
-    MINUS: boolean;
+    BUS1: boolean;
+    BUS2: boolean;
   };
   pendingActions?: {
-    PLUS: boolean;
-    MINUS: boolean;
+    BUS1: boolean;
+    BUS2: boolean;
   };
 } & TimingState;
 
@@ -42,8 +42,8 @@ export type PrivateStateResult = {
   status: RoomState["status"];
   team?: Colour;
   playerName?: string;
-  isPlusController?: boolean;
-  isMinusController?: boolean;
+  isBus1Controller?: boolean;
+  isBus2Controller?: boolean;
 } & TimingState;
 
 export function usePublicGame(roomCode: string) {

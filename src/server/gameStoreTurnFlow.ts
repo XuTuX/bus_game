@@ -282,18 +282,18 @@ function scoreCurrentBusRegions(game: GameState) {
     ...game.buses.BUS2.walls,
   ];
 
-  const plusBus = game.buses.BUS1;
-  const plusSize = getConnectedComponentSize(plusBus.pos, game.board, allWalls);
-  const plusColor = game.board[plusBus.pos.y]?.[plusBus.pos.x]?.colour;
-  if (plusColor) {
-    game.teamScores[plusColor] += plusSize;
+  const bus1State = game.buses.BUS1;
+  const bus1Size = getConnectedComponentSize(bus1State.pos, game.board, allWalls);
+  const bus1Color = game.board[bus1State.pos.y]?.[bus1State.pos.x]?.colour;
+  if (bus1Color) {
+    game.teamScores[bus1Color] += bus1Size;
   }
 
-  const minusBus = game.buses.BUS2;
-  const minusSize = getConnectedComponentSize(minusBus.pos, game.board, allWalls);
-  const minusColor = game.board[minusBus.pos.y]?.[minusBus.pos.x]?.colour;
-  if (minusColor) {
-    game.teamScores[minusColor] -= minusSize;
+  const bus2State = game.buses.BUS2;
+  const bus2Size = getConnectedComponentSize(bus2State.pos, game.board, allWalls);
+  const bus2Color = game.board[bus2State.pos.y]?.[bus2State.pos.x]?.colour;
+  if (bus2Color) {
+    game.teamScores[bus2Color] -= bus2Size;
   }
 }
 

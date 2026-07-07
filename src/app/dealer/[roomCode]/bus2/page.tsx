@@ -1,7 +1,7 @@
 import DealerRoom from "@/components/DealerRoom";
 import { BusType } from "@/lib/game";
 
-export default async function MinusDealerRoomPage({
+export default async function Bus2DealerRoomPage({
   params,
 }: {
   params: Promise<{ roomCode: string }>;
