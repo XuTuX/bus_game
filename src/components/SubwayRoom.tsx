@@ -279,7 +279,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                       >
                         <strong>{player.playerName ?? player.playerId}</strong>
                         <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
-                          {player.room === BusType.BUS1 ? "버스 1방" : "버스 2방"} · {player.roomIndex}번 {submitted ? "(제출 완료)" : ""}
+                          {player.room === BusType.BUS1 ? "1번 버스방" : "2번 버스방"} · {player.roomIndex}번 {submitted ? "(제출 완료)" : ""}
                         </span>
                       </button>
                     );

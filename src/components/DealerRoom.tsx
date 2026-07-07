@@ -257,7 +257,7 @@ export default function DealerRoom({
   const displayGame =
     animatedGame || (status === "CHOOSING" ? submittedPreviewGame : null) || game;
   const activeBusPos = displayGame.buses[activeBusType].pos;
-  const roomBusLabel = selectedBus === BusType.BUS1 ? "버스 1" : "버스 2";
+  const roomBusLabel = selectedBus === BusType.BUS1 ? "1번 버스" : "2번 버스";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
   // Generate cells centered at the active bus position
@@ -447,10 +447,10 @@ export default function DealerRoom({
 
   // Role subtitle text
   const getRoleSubtitle = () => {
-    if (roomBus) return `(${roomBusLabel} 버스 전용 방)`;
-    if (isBus1Controller && isBus2Controller) return "(버스 1 & 버스 2 제어)";
-    if (isBus1Controller) return "(버스 1 제어)";
-    if (isBus2Controller) return "(버스 2 제어)";
+    if (roomBus) return `(${roomBusLabel} 전용 방)`;
+    if (isBus1Controller && isBus2Controller) return "(1번 버스 & 2번 버스 제어)";
+    if (isBus1Controller) return "(1번 버스 제어)";
+    if (isBus2Controller) return "(2번 버스 제어)";
     return "(대기 중)";
   };
 
@@ -518,8 +518,8 @@ export default function DealerRoom({
                 <h3 className="brand-font" style={{ color: "var(--bus1-color)" }}>이동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>상대방 플레이어의 이동 카드 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span>버스 1 제출 상태: {isBus1Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
-                  <span>버스 2 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>1번 버스 제출 상태: {isBus1Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>2번 버스 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
               </div>
             ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
@@ -527,8 +527,8 @@ export default function DealerRoom({
                 <h3 className="brand-font" style={{ color: "var(--bus2-color)" }}>행동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span>버스 1 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
-                  <span>버스 2 행동 제출: {isBus2ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>1번 버스 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
+                  <span>2번 버스 행동 제출: {isBus2ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
               </div>
             ) : !canAct ? (
@@ -554,7 +554,7 @@ export default function DealerRoom({
                             color: "white",
                           }}
                         >
-                          {activeBusType === BusType.BUS1 ? "🚌 버스 1 전용" : "🚌 버스 2 전용"}
+                          {activeBusType === BusType.BUS1 ? "🚌 1번 버스 전용" : "🚌 2번 버스 전용"}
                         </div>
                       </div>
                     ) : (
@@ -563,19 +563,6 @@ export default function DealerRoom({
                           움직일 버스 선택
                         </label>
                         <div className="tile-action-options">
-                          <button
-                            type="button"
-                            className={`tile-action-btn ${chosenBus === BusType.BUS1 ? "tile-action-btn-active" : ""}`}
-                            style={{
-                              background: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
-                              borderColor: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
-                              color: chosenBus === BusType.BUS1 ? "white" : undefined,
-                            }}
-                            onClick={() => setChosenBus(BusType.BUS1)}
-                            disabled={bus1Disabled}
-                          >
-                            🚌 버스 1
-                          </button>
                           <button
                             type="button"
                             className={`tile-action-btn ${chosenBus === BusType.BUS2 ? "tile-action-btn-active" : ""}`}
@@ -587,7 +574,20 @@ export default function DealerRoom({
                             onClick={() => setChosenBus(BusType.BUS2)}
                             disabled={bus2Disabled}
                           >
-                            🚌 버스 2
+                            🚌 2번 버스
+                          </button>
+                          <button
+                            type="button"
+                            className={`tile-action-btn ${chosenBus === BusType.BUS1 ? "tile-action-btn-active" : ""}`}
+                            style={{
+                              background: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
+                              borderColor: chosenBus === BusType.BUS1 ? "var(--bus1-color)" : undefined,
+                              color: chosenBus === BusType.BUS1 ? "white" : undefined,
+                            }}
+                            onClick={() => setChosenBus(BusType.BUS1)}
+                            disabled={bus1Disabled}
+                          >
+                            🚌 1번 버스
                           </button>
                         </div>
                       </div>
@@ -712,7 +712,7 @@ export default function DealerRoom({
                       <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 2: 행동 선택</h3>
                     </div>
                     <p className="dealer-subtitle" style={{ marginBottom: 16 }}>
-                      이동이 적용되었습니다. <strong>{activeBusType === BusType.BUS1 ? "버스 1" : "버스 2"} 버스</strong> 위치 (
+                      이동이 적용되었습니다. <strong>{activeBusType === BusType.BUS1 ? "1번 버스" : "2번 버스"}</strong> 위치 (
                       {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
                     </p>
 

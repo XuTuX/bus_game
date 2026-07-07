@@ -164,8 +164,8 @@ function RoomSection({
   status: RoomStatus;
   onNameSave?: (playerId: string, name: string) => void;
 }) {
-  const roomName = busType === BusType.BUS1 ? "버스 1 방" : "버스 2 방";
-  const roomSymbol = busType === BusType.BUS1 ? "1" : "2";
+  const roomName = busType === BusType.BUS1 ? "1번 버스 방" : "2번 버스 방";
+  const roomSymbol = busType === BusType.BUS1 ? "1번" : "2번";
 
   return (
     <section className={`player-room-section player-room-section-${busType.toLowerCase()}`}>

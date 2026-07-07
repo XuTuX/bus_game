@@ -100,7 +100,7 @@ export default function ScoreBoard({
                 />
                 <div style={{ flex: 1, textAlign: "left" }}>
                   <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                    지하철 {busType === BusType.BUS1 ? "1" : "2"} (길이 {subway.pos.length})
+                    {busType === BusType.BUS1 ? "1호선" : "2호선"} (길이 {subway.pos.length})
                   </div>
                   <div
                     style={{
