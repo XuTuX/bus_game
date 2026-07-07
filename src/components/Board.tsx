@@ -132,36 +132,44 @@ export default function Board({
         );
       })}
 
-      {game.subway && game.subway.pos.map((pos, index) => {
-        const step = tileSize + tileGap;
-        const left = 12 + pos.x * step + tileSize / 2 - 14;
-        const top = 12 + pos.y * step + tileSize / 2 - 14;
-        return (
-          <div
-            key={`subway-${index}`}
-            className="subway-marker"
-            style={{
-              position: "absolute",
-              width: 28,
-              height: 28,
-              background: index === 0 ? "#333" : "#666",
-              borderRadius: index === 0 ? "8px" : "14px",
-              left,
-              top,
-              zIndex: 10,
-              boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontSize: "12px",
-              fontWeight: "bold"
-            }}
-          >
-            {index === 0 ? "S" : ""}
-          </div>
-        );
-      })}
+      {game.subways && Object.entries(game.subways)
+        .filter(([busType]) => !showFacingFor || showFacingFor === busType)
+        .map(([busType, subway]) => {
+          return subway.pos.map((pos, index) => {
+            const step = tileSize + tileGap;
+            const left = 12 + pos.x * step + tileSize / 2 - 12;
+            const top = 12 + pos.y * step + tileSize / 2 - 12;
+            const isBus1 = busType === BusType.BUS1;
+            return (
+              <div
+                key={`subway-${busType}-${index}`}
+                className={`subway-marker subway-marker-${busType}`}
+                style={{
+                  position: "absolute",
+                  width: 24,
+                  height: 24,
+                  background: index === 0 
+                    ? (isBus1 ? "#111" : "#222") 
+                    : (isBus1 ? "var(--bus1-color)" : "var(--bus2-color)"),
+                  borderRadius: index === 0 ? "6px" : "12px",
+                  left,
+                  top,
+                  zIndex: 10,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  border: "1px solid rgba(255,255,255,0.7)",
+                }}
+              >
+                {index === 0 ? (isBus1 ? "S1" : "S2") : ""}
+              </div>
+            );
+          });
+        })}
     </div>
   );
 }

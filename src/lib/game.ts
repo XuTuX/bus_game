@@ -70,7 +70,7 @@ export interface SubwayState {
 export interface GameState {
   board: Tile[][];
   buses: Record<BusType, BusState>;
-  subway: SubwayState;
+  subways: Record<BusType, SubwayState>;
   players: Player[];
   turnIndex: number;
   roundIndex: number;
@@ -418,7 +418,8 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
     
     let result: StepResult;
     if (action.subway) {
-      result = stepSubway(game.subway, card);
+      const busType = action.bus ?? BusType.BUS1;
+      result = stepSubway(game.subways[busType], card);
     } else {
       const busType = action.bus ?? BusType.BUS1;
       const bus = game.buses[busType];
@@ -485,17 +486,17 @@ export function runMovePhase(player: Player, actions: MoveTurnAction[], game: Ga
 
   // End of turn Subway scoring
   if (actions.length > 0) {
-    let subwayGained = 0;
     const scoredColors = new Set<Colour>();
-    for (const pos of game.subway.pos) {
-      const tile = game.board[pos.y]?.[pos.x];
-      if (tile && tile.colour) {
-        scoredColors.add(tile.colour);
+    for (const [busType, subway] of Object.entries(game.subways)) {
+      for (const pos of subway.pos) {
+        const tile = game.board[pos.y]?.[pos.x];
+        if (tile && tile.colour) {
+          scoredColors.add(tile.colour);
+        }
       }
     }
     for (const colour of scoredColors) {
       game.teamScores[colour] += 1;
-      subwayGained += 1;
       game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
     }
   }
@@ -596,17 +597,31 @@ export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): 
         regions: [],
       },
     },
-    subway: {
-      pos: [
-        { x: 5, y: 0 },
-        { x: 4, y: 0 },
-        { x: 3, y: 0 },
-        { x: 2, y: 0 },
-        { x: 1, y: 0 },
-        { x: 0, y: 0 },
-      ],
-      facing: Facing.E,
-      active: false,
+    subways: {
+      [BusType.BUS1]: {
+        pos: [
+          { x: 5, y: 0 },
+          { x: 4, y: 0 },
+          { x: 3, y: 0 },
+          { x: 2, y: 0 },
+          { x: 1, y: 0 },
+          { x: 0, y: 0 },
+        ],
+        facing: Facing.E,
+        active: false,
+      },
+      [BusType.BUS2]: {
+        pos: [
+          { x: 5, y: 8 },
+          { x: 4, y: 8 },
+          { x: 3, y: 8 },
+          { x: 2, y: 8 },
+          { x: 1, y: 8 },
+          { x: 0, y: 8 },
+        ],
+        facing: Facing.E,
+        active: false,
+      },
     },
     players,
     turnIndex: 0,

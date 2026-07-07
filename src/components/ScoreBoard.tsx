@@ -87,20 +87,20 @@ export default function ScoreBoard({
               );
             })}
 
-            {game.subway && (
-              <div className="score-item" style={{ gap: 8 }}>
+            {game.subways && Object.entries(game.subways).map(([busType, subway]) => (
+              <div className="score-item" key={busType} style={{ gap: 8 }}>
                 <div
                   style={{
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
                     flexShrink: 0,
-                    background: "#555",
+                    background: busType === BusType.BUS1 ? "var(--bus1-color)" : "var(--bus2-color)",
                   }}
                 />
                 <div style={{ flex: 1, textAlign: "left" }}>
                   <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                    지하철 (길이 {game.subway.pos.length})
+                    지하철 {busType === BusType.BUS1 ? "1" : "2"} (길이 {subway.pos.length})
                   </div>
                   <div
                     style={{
@@ -109,11 +109,11 @@ export default function ScoreBoard({
                       marginTop: 2,
                     }}
                   >
-                    머리: ({game.subway.pos[0]?.x}, {game.subway.pos[0]?.y}) · {FACING_LABELS[game.subway.facing]} 방향
+                    머리: ({subway.pos[0]?.x}, {subway.pos[0]?.y}) · {FACING_LABELS[subway.facing]} 방향
                   </div>
                 </div>
               </div>
-            )}
+            ))}
           </div>
 
           <h2>📝 최근 로그</h2>
