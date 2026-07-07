@@ -16,7 +16,7 @@ import {
   usePhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
-import { COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
+import { BusType, COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -66,43 +66,6 @@ export default function AdminPage({
     timerDirty,
   ]);
 
-  useEffect(() => {
-    if (!timerDirty) return;
-
-    const timerValue = Number(timerMinutes);
-    if (!Number.isFinite(timerValue) || timerValue < 1) {
-      return;
-    }
-
-    let cancelled = false;
-    const timeout = setTimeout(async () => {
-      setSavingTimers(true);
-      setErrorMsg("");
-      try {
-        await adminSetTimers(roomCode, {
-          movePhaseSeconds: Math.round(timerValue * 60),
-          actionPhaseSeconds: Math.round(timerValue * 60),
-        });
-        if (!cancelled) {
-          setTimerDirty(false);
-        }
-      } catch (error: any) {
-        if (!cancelled) {
-          setErrorMsg(error.message || "시간 설정 저장에 실패했습니다.");
-        }
-      } finally {
-        if (!cancelled) {
-          setSavingTimers(false);
-        }
-      }
-    }, 600);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [roomCode, timerDirty, timerMinutes]);
-
   if (!state) {
     return (
       <div className="dealer-layout loading-screen">
@@ -112,9 +75,14 @@ export default function AdminPage({
   }
 
   const { status, game, participants, logs, activePlayerNames } = state;
-  const subwayMoveTeams = state.subwayMoveTeams ?? [];
-  const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
+  const pendingSubwayMoves = state.pendingSubwayMoves ?? { BUS1: false, BUS2: false };
   const canStartGame = participants.length > 0;
+  const timerButtonLabel =
+    status === "WAITING"
+      ? "입력 시작"
+      : status === "CHOOSING" || status === "ACTION_PHASE"
+        ? "타이머 시작"
+        : "시간 저장";
   const runAdminAction = async (
     action: "start_game" | "start"
   ) => {
@@ -128,6 +96,35 @@ export default function AdminPage({
       setErrorMsg(error.message || "진행 작업에 실패했습니다.");
     } finally {
       setBusyAction(false);
+    }
+  };
+
+  const handleTimerStart = async () => {
+    if (savingTimers) return;
+
+    const timerValue = Number(timerMinutes);
+    if (!Number.isFinite(timerValue) || timerValue < 1) {
+      setErrorMsg("타이머는 1분 이상으로 입력하세요.");
+      return;
+    }
+
+    setSavingTimers(true);
+    setErrorMsg("");
+    try {
+      await adminSetTimers(roomCode, {
+        movePhaseSeconds: Math.round(timerValue * 60),
+        actionPhaseSeconds: Math.round(timerValue * 60),
+      });
+      setTimerDirty(false);
+      if (status === "WAITING") {
+        await adminAction(roomCode, "start");
+      } else if (status === "CHOOSING" || status === "ACTION_PHASE") {
+        await adminAction(roomCode, "start_timer");
+      }
+    } catch (error: any) {
+      setErrorMsg(error.message || "타이머 시작에 실패했습니다.");
+    } finally {
+      setSavingTimers(false);
     }
   };
 
@@ -273,8 +270,16 @@ export default function AdminPage({
               <small>분</small>
             </label>
             <div className="timer-save-state">
-              {savingTimers ? "저장 중" : timerDirty ? "자동 저장 대기" : "저장됨"}
+              {timerDirty ? "변경됨" : "저장됨"}
             </div>
+            <button
+              className="btn btn-primary timer-start-btn"
+              disabled={savingTimers}
+              onClick={handleTimerStart}
+              type="button"
+            >
+              {savingTimers ? "처리 중" : timerButtonLabel}
+            </button>
           </div>
 
           {errorMsg && <div className="error-box">{errorMsg}</div>}
@@ -317,13 +322,10 @@ export default function AdminPage({
           )}
 
           {status === "WAITING" && (
-            <button
-              className="btn btn-primary master-action"
-              onClick={() => runAdminAction("start")}
-              disabled={busyAction}
-            >
-              딜러룸 입력 시작
-            </button>
+            <div className="master-waiting">
+              <h2 className="brand-font">입력 시작 대기</h2>
+              <p>타이머 시간을 확인한 뒤 위의 입력 시작 버튼을 누르면 딜러룸 입력과 타이머가 함께 시작됩니다.</p>
+            </div>
           )}
 
           {(status === "CHOOSING" || status === "ACTION_PHASE") && (
@@ -334,12 +336,11 @@ export default function AdminPage({
               <p>
                 {activePlayerNames} 님이 제출하면 바로 공개판에 반영됩니다.
               </p>
-              {status === "CHOOSING" && subwayMoveTeams.length > 0 && (
+              {(status === "CHOOSING" || status === "ACTION_PHASE") && (
                 <div className="status-metadata" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {subwayMoveTeams.map((team) => (
-                    <span key={team} className="team-pill">
-                      <span className={`score-dot score-dot-${team}`} />
-                      {team} 지하철: {pendingSubwayMoves[team] ? "완료" : "대기"}
+                  {([BusType.BUS1, BusType.BUS2] as const).map((subway) => (
+                    <span key={subway} className="team-pill">
+                      {subway === BusType.BUS1 ? "1호선" : "2호선"} 지하철: {pendingSubwayMoves[subway] ? "완료" : "대기"}
                     </span>
                   ))}
                 </div>

@@ -99,7 +99,9 @@ export interface SwapTileTurnAction {
 export interface PlaceObstacleTurnAction {
   type: "PLACE_OBSTACLE";
   bus: BusType;
-  target: Coord;
+  target?: Coord;
+  from?: Coord;
+  to?: Coord;
 }
 
 export type TurnAction = MoveTurnAction | SwapTileTurnAction | PlaceObstacleTurnAction;
@@ -525,15 +527,17 @@ export function runActionPhase(
   if (action) {
     const bus = game.buses[action.bus];
     const busPos = bus.pos;
-    const dx = Math.abs(action.target.x - busPos.x);
-    const dy = Math.abs(action.target.y - busPos.y);
-
-    const targetTile = game.board[action.target.y]?.[action.target.x];
     const busTile = game.board[busPos.y]?.[busPos.x];
 
-    if (!targetTile || !busTile) {
+    if (!busTile) {
       result = { applied: false, reason: "invalid-target", regions: [] };
     } else if (action.type === "SWAP_TILE") {
+      const dx = Math.abs(action.target.x - busPos.x);
+      const dy = Math.abs(action.target.y - busPos.y);
+      const targetTile = game.board[action.target.y]?.[action.target.x];
+      if (!targetTile) {
+        return { applied: false, reason: "invalid-target", regions: [] };
+      }
       if (dx > 1 || dy > 1) {
         result = { applied: false, reason: "target-out-of-range", regions: [] };
       } else {
@@ -545,6 +549,49 @@ export function runActionPhase(
         result = { applied: true, regions: [] };
       }
     } else if (action.type === "PLACE_OBSTACLE") {
+      if (action.from && action.to) {
+        const fromTile = game.board[action.from.y]?.[action.from.x];
+        const toTile = game.board[action.to.y]?.[action.to.x];
+        if (!fromTile || !toTile) {
+          return { applied: false, reason: "invalid-target", regions: [] };
+        }
+
+        const edgeDx = Math.abs(action.from.x - action.to.x);
+        const edgeDy = Math.abs(action.from.y - action.to.y);
+        if (edgeDx + edgeDy !== 1) {
+          return { applied: false, reason: "target-not-adjacent", regions: [] };
+        }
+
+        const fromBusDx = Math.abs(action.from.x - busPos.x);
+        const fromBusDy = Math.abs(action.from.y - busPos.y);
+        const toBusDx = Math.abs(action.to.x - busPos.x);
+        const toBusDy = Math.abs(action.to.y - busPos.y);
+        if (fromBusDx > 1 || fromBusDy > 1 || toBusDx > 1 || toBusDy > 1) {
+          return { applied: false, reason: "target-out-of-range", regions: [] };
+        }
+
+        const candidate = wallBetweenTiles(action.from, action.to);
+        const existingWalls = Object.values(game.buses).flatMap((state) => state.walls);
+        if (wallConflicts(candidate, existingWalls)) {
+          return { applied: false, reason: "obstacle-conflict", regions: [] };
+        }
+
+        bus.walls.push({ ...candidate, bus: action.bus });
+        return { applied: true, regions: [] };
+      }
+
+      if (!action.target) {
+        return { applied: false, reason: "invalid-target", regions: [] };
+      }
+
+      const target = action.target;
+      const dx = Math.abs(target.x - busPos.x);
+      const dy = Math.abs(target.y - busPos.y);
+      const targetTile = game.board[target.y]?.[target.x];
+      if (!targetTile) {
+        return { applied: false, reason: "invalid-target", regions: [] };
+      }
+
       if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
         return { applied: false, reason: "target-not-straight-line", regions: [] };
       }
@@ -552,12 +599,12 @@ export function runActionPhase(
         return { applied: false, reason: "target-out-of-range", regions: [] };
       }
 
-      const isObstacleExist = game.obstacles.some(o => o.x === action.target.x && o.y === action.target.y);
+      const isObstacleExist = game.obstacles.some(o => o.x === target.x && o.y === target.y);
       if (isObstacleExist) {
         return { applied: false, reason: "obstacle-conflict", regions: [] };
       }
 
-      game.obstacles.push(action.target);
+      game.obstacles.push(target);
       result = { applied: true, regions: [] };
     }
   }

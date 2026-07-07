@@ -167,11 +167,18 @@ export async function adminSetRoomTimers(
     };
 
     room.timerSettings = nextSettings;
+  });
+}
 
+export async function adminStartRoomTimer(roomCode: string): Promise<void> {
+  await mutateRoom(roomCode, (room) => {
+    const timerSettings = getRoomTimerSettings(room);
     if (room.status === "CHOOSING") {
-      startPhaseTimer(room, nextSettings.movePhaseSeconds);
+      startPhaseTimer(room, timerSettings.movePhaseSeconds);
     } else if (room.status === "ACTION_PHASE") {
-      startPhaseTimer(room, nextSettings.actionPhaseSeconds);
+      startPhaseTimer(room, timerSettings.actionPhaseSeconds);
+    } else {
+      throw new Error("타이머는 딜러룸 입력 중에만 시작할 수 있습니다.");
     }
   });
 }

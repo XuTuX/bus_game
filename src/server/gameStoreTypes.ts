@@ -1,5 +1,6 @@
 import {
   BusType,
+  type CardKind,
   Colour,
   type GameState,
   type MoveTurnAction,
@@ -14,6 +15,7 @@ export interface SubwayMoveSubmission {
   team: Colour;
   subway: BusType;
   action: MoveTurnAction | null;
+  cardKind?: CardKind;
 }
 
 export interface LobbyParticipant {
@@ -51,7 +53,7 @@ export interface RoomState {
     BUS1?: MoveTurnAction[];
     BUS2?: MoveTurnAction[];
   };
-  pendingSubwayMoves: Partial<Record<Colour, SubwayMoveSubmission>>;
+  pendingSubwayMoves: Partial<Record<BusType, SubwayMoveSubmission>>;
   pendingActions: {
     BUS1?: ActionPhaseTurnAction | null;
     BUS2?: ActionPhaseTurnAction | null;

@@ -5,6 +5,7 @@ import {
   adminSetRoomTimers,
   adminSetParticipantColour,
   adminStartGame,
+  adminStartRoomTimer,
   adminStartTurn,
 } from "@/server/gameStore";
 import { Colour } from "@/lib/game";
@@ -24,7 +25,8 @@ export async function POST(
         | "set_player_colour"
         | "set_timers"
         | "start_game"
-        | "start";
+        | "start"
+        | "start_timer";
       name?: string;
       playerId?: string;
       colour?: Colour;
@@ -51,6 +53,8 @@ export async function POST(
       await adminStartGame(roomCode);
     } else if (action === "start") {
       await adminStartTurn(roomCode);
+    } else if (action === "start_timer") {
+      await adminStartRoomTimer(roomCode);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

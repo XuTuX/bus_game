@@ -42,14 +42,6 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Blue: "var(--team-blue)",
 };
 
-const TEAM_BG_VARS: Record<Colour, string> = {
-  Red: "var(--team-red-bg)",
-  Orange: "var(--team-orange-bg)",
-  Yellow: "var(--team-yellow-bg)",
-  Green: "var(--team-green-bg)",
-  Blue: "var(--team-blue-bg)",
-};
-
 const CARD_ORDER: CardKind[] = [
   "STRAIGHT1",
   "STRAIGHT2",
@@ -61,8 +53,8 @@ const CARD_ORDER: CardKind[] = [
 const STATUS_TEXT = {
   LOBBY: "마스터가 사람을 입력하는 중입니다.",
   WAITING: "마스터가 딜러룸 입력을 시작할 때까지 대기하세요.",
-  CHOOSING: "지하철 조작 팀이 카드를 제출하거나 패스합니다.",
-  ACTION_PHASE: "이동이 완료되어 버스 행동 단계입니다.",
+  CHOOSING: "각 지하철 담당자가 카드를 제출하거나 패스할 수 있습니다.",
+  ACTION_PHASE: "버스 행동 단계가 끝나기 전까지 지하철을 제출할 수 있습니다.",
   GAME_OVER: "게임이 종료되었습니다.",
 } as const;
 
@@ -70,63 +62,42 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   const publicState = usePublicGame(roomCode);
   const game = publicState?.game as GameState | undefined;
   const phaseTimeLabel = usePhaseTimeLabel(publicState);
-  const subwayTeams = useMemo(
-    () => publicState?.subwayMoveTeams ?? [],
-    [publicState?.subwayMoveTeams]
-  );
   const pendingSubwayMoves = useMemo(
-    () => publicState?.pendingSubwayMoves ?? {},
+    () => publicState?.pendingSubwayMoves ?? { BUS1: false, BUS2: false },
     [publicState?.pendingSubwayMoves]
   );
+  const subwayControllers = publicState?.subwayControllers;
 
   const [selectedSubway, setSelectedSubway] = useState<BusType>(BusType.BUS1);
-  const [selectedTeam, setSelectedTeam] = useState<Colour | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedKind, setSelectedKind] = useState<CardKind | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const selectedController =
+    selectedSubway === BusType.BUS1
+      ? subwayControllers?.BUS1
+      : subwayControllers?.BUS2;
   const selectedPrivateState = usePrivateGame(roomCode, selectedPlayerId);
   const hand = selectedPrivateState?.hand ?? [];
-  const playersForTeam = useMemo(() => {
-    if (!game || !selectedTeam) return [];
-    return game.players.filter((player) => player.team === selectedTeam);
-  }, [game, selectedTeam]);
-  const isSelectedTeamSubmitted = selectedTeam
-    ? !!pendingSubwayMoves[selectedTeam]
-    : false;
+  const isSelectedSubwaySubmitted = !!pendingSubwayMoves[selectedSubway];
+  const canSubwaySubmitPhase =
+    publicState?.status === "CHOOSING" || publicState?.status === "ACTION_PHASE";
   const canSubmit =
-    publicState?.status === "CHOOSING" &&
-    !!selectedTeam &&
-    subwayTeams.includes(selectedTeam) &&
-    !isSelectedTeamSubmitted &&
+    canSubwaySubmitPhase &&
+    !!selectedController &&
+    !isSelectedSubwaySubmitted &&
     !!selectedPlayerId &&
     !submitting;
 
   useEffect(() => {
-    const firstOpenTeam =
-      subwayTeams.find((team) => !pendingSubwayMoves[team]) ?? subwayTeams[0] ?? null;
-    setSelectedTeam((current) =>
-      current && subwayTeams.includes(current) ? current : firstOpenTeam
-    );
-  }, [pendingSubwayMoves, subwayTeams]);
-
-  useEffect(() => {
-    if (!selectedTeam) {
-      setSelectedPlayerId("");
-      return;
-    }
-    setSelectedPlayerId((current) =>
-      playersForTeam.some((player) => player.id === current)
-        ? current
-        : playersForTeam[0]?.id ?? ""
-    );
+    setSelectedPlayerId(selectedController?.playerId ?? "");
     setErrorMsg("");
-  }, [playersForTeam, selectedTeam]);
+  }, [selectedController?.playerId]);
 
   useEffect(() => {
     setSelectedKind(null);
-  }, [selectedPlayerId, selectedTeam]);
+  }, [selectedPlayerId, selectedSubway]);
 
   const getCardCount = (kind: CardKind) =>
     hand.filter((card) => card.kind === kind).length;
@@ -216,7 +187,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
           <section className="dealer-panel dealer-hand-pane">
             <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
               <h2 className="brand-font">지하철 입력</h2>
-              <span>팀당 카드 최대 1장</span>
+              <span>지하철당 카드 최대 1장</span>
             </div>
 
             {errorMsg && <div className="error-box">{errorMsg}</div>}
@@ -224,86 +195,61 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
             <div style={{ marginBottom: 18 }}>
               <label className="subway-control-label">움직일 지하철</label>
               <div className="tile-action-options">
-                <button
-                  type="button"
-                  className={`tile-action-btn ${selectedSubway === BusType.BUS1 ? "tile-action-btn-active" : ""}`}
-                  onClick={() => setSelectedSubway(BusType.BUS1)}
-                  disabled={submitting}
-                >
-                  1호선
-                </button>
-                <button
-                  type="button"
-                  className={`tile-action-btn ${selectedSubway === BusType.BUS2 ? "tile-action-btn-active" : ""}`}
-                  onClick={() => setSelectedSubway(BusType.BUS2)}
-                  disabled={submitting}
-                >
-                  2호선
-                </button>
+                {([BusType.BUS1, BusType.BUS2] as const).map((subway) => {
+                  const controller =
+                    subway === BusType.BUS1
+                      ? subwayControllers?.BUS1
+                      : subwayControllers?.BUS2;
+                  const submitted = !!pendingSubwayMoves[subway];
+                  return (
+                    <button
+                      key={subway}
+                      type="button"
+                      className={`tile-action-btn ${selectedSubway === subway ? "tile-action-btn-active" : ""}`}
+                      onClick={() => setSelectedSubway(subway)}
+                      disabled={submitting || !controller}
+                    >
+                      <strong>{subway === BusType.BUS1 ? "1호선" : "2호선"}</strong>
+                      <span style={{ display: "block", fontSize: "0.82rem", marginTop: 4 }}>
+                        {controller
+                          ? `${controller.playerName ?? controller.playerId} · ${controller.team}`
+                          : "담당자 없음"}
+                        {" · "}
+                        {submitted ? "제출 완료" : "입력 대기"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <label className="subway-control-label">제출 팀</label>
-              <div className="subway-team-grid">
-                {subwayTeams.length === 0 ? (
-                  <div className="dealer-wait-card" style={{ gridColumn: "1 / -1" }}>
-                    <h3 className="brand-font">대기 중</h3>
-                    <p>현재 지하철을 조작할 팀이 없습니다.</p>
+              <label className="subway-control-label">제출 담당자</label>
+              <div className="dealer-wait-card" style={{ padding: 16 }}>
+                {selectedController ? (
+                  <div className="team-pill" style={{ justifyContent: "center" }}>
+                    <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[selectedController.team] }} />
+                    <span>
+                      {selectedController.playerName ?? selectedController.playerId}
+                      {" · "}
+                      {selectedController.team}
+                    </span>
                   </div>
                 ) : (
-                  subwayTeams.map((team) => {
-                    const submitted = !!pendingSubwayMoves[team];
-                    return (
-                      <button
-                        key={team}
-                        type="button"
-                        className={`subway-team-button ${selectedTeam === team ? "subway-team-button-active" : ""}`}
-                        onClick={() => setSelectedTeam(team)}
-                        disabled={submitting}
-                        style={{
-                          borderColor: selectedTeam === team ? TEAM_COLOUR_VARS[team] : undefined,
-                          background: selectedTeam === team ? TEAM_BG_VARS[team] : undefined,
-                        }}
-                      >
-                        <span className="score-dot" style={{ background: TEAM_COLOUR_VARS[team] }} />
-                        <strong>{team}</strong>
-                        <span>{submitted ? "제출 완료" : "입력 대기"}</span>
-                      </button>
-                    );
-                  })
+                  <p>선택한 지하철 담당자가 없습니다.</p>
                 )}
               </div>
             </div>
 
-            {selectedTeam && (
-              <div style={{ marginBottom: 18 }}>
-                <label className="subway-control-label">제출 플레이어</label>
-                <div className="tile-action-options">
-                  {playersForTeam.map((player) => (
-                    <button
-                      key={player.id}
-                      type="button"
-                      className={`tile-action-btn ${selectedPlayerId === player.id ? "tile-action-btn-active" : ""}`}
-                      onClick={() => setSelectedPlayerId(player.id)}
-                      disabled={submitting || isSelectedTeamSubmitted}
-                    >
-                      {player.name ?? player.id}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {publicState.status !== "CHOOSING" ? (
+            {!canSubwaySubmitPhase ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">{STATUS_TEXT[publicState.status] ?? "대기 중"}</h3>
-                <p>이동 카드 선택 단계가 시작되면 지하철 카드를 제출할 수 있습니다.</p>
+                <p>이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다.</p>
               </div>
-            ) : isSelectedTeamSubmitted ? (
+            ) : isSelectedSubwaySubmitted ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">제출 완료</h3>
-                <p>{selectedTeam}팀의 지하철 입력이 이미 접수되었습니다.</p>
+                <p>{selectedSubway === BusType.BUS1 ? "1호선" : "2호선"} 지하철 입력이 이미 접수되었습니다.</p>
               </div>
             ) : (
               <>

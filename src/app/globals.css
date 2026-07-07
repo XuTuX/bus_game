@@ -37,6 +37,7 @@
   --bus1-glow: rgba(0, 206, 201, 0.5);
   --bus2-color: #fd79a8;
   --bus2-glow: rgba(253, 121, 168, 0.5);
+  --obstacle-wall-color: #111111;
 
   /* Sizing */
   --tile-size: 56px;
@@ -230,14 +231,14 @@ h1, h2, h3, .brand-font {
 }
 
 .wall-bus1 {
-  stroke: var(--bus1-color);
-  stroke-width: 4;
+  stroke: var(--obstacle-wall-color);
+  stroke-width: 5;
   stroke-linecap: round;
 }
 
 .wall-bus2 {
-  stroke: var(--bus2-color);
-  stroke-width: 4;
+  stroke: var(--obstacle-wall-color);
+  stroke-width: 5;
   stroke-linecap: round;
 }
 
@@ -591,7 +592,7 @@ h1, h2, h3, .brand-font {
 
 .timer-settings-form {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   margin-bottom: 20px;
@@ -634,6 +635,12 @@ h1, h2, h3, .brand-font {
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.timer-start-btn {
+  box-shadow: none;
+  padding: 12px 18px;
   white-space: nowrap;
 }
 
@@ -1516,6 +1523,25 @@ h1, h2, h3, .brand-font {
 .action-grid-cell.center-cell {
   background: rgba(0, 0, 0, 0.05);
 }
+.bus-cell-label {
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(0, 206, 201, 0.95);
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+}
 .action-grid-cell.disabled {
   cursor: not-allowed;
   border-color: transparent;
@@ -1527,6 +1553,53 @@ h1, h2, h3, .brand-font {
   align-items: center;
   gap: 16px;
   margin-top: 24px;
+}
+
+.obstacle-edge-picker {
+  position: relative;
+  width: 200px;
+  margin: 16px auto;
+}
+
+.obstacle-edge-grid {
+  margin: 0;
+}
+
+.obstacle-edge-grid .action-grid-cell {
+  cursor: default;
+}
+
+.obstacle-edge-button {
+  position: absolute;
+  z-index: 5;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #111;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.obstacle-edge-vertical {
+  width: 8px;
+  height: 50px;
+}
+
+.obstacle-edge-horizontal {
+  width: 50px;
+  height: 8px;
+}
+
+.obstacle-edge-button:hover:not(:disabled),
+.obstacle-edge-selected {
+  background: var(--team-blue);
+  box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.obstacle-edge-disabled {
+  cursor: not-allowed;
+  opacity: 0.18;
 }
 
 /* Glowing manual obstacles (between tiles) */

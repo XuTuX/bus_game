@@ -1,4 +1,4 @@
-import { type Card } from "@/lib/game";
+import { BusType, type Card } from "@/lib/game";
 import { getRoomTimerSettings } from "./gameStoreTimers";
 import {
   type RoomRecord,
@@ -7,7 +7,6 @@ import {
 } from "./gameStoreTypes";
 import {
   deepClone,
-  getSubwayMoveTeams,
   getTurnControllers,
 } from "./gameStoreUtils";
 
@@ -17,11 +16,7 @@ export function buildPublicState(record: RoomRecord) {
   safeGame.players.forEach((player) => {
     (player.hand as any) = Array(player.hand.length).fill({ kind: "HIDDEN" });
   });
-  const { busTeam } = getTurnControllers(room.game);
-  const subwayMoveTeams = getSubwayMoveTeams(room.game);
-  const pendingSubwayMoves = Object.fromEntries(
-    subwayMoveTeams.map((team) => [team, !!room.pendingSubwayMoves?.[team]])
-  );
+  const { bus1Player, bus2Player, busTeam } = getTurnControllers(room.game);
 
   return {
     game: safeGame,
@@ -38,8 +33,18 @@ export function buildPublicState(record: RoomRecord) {
       BUS2: room.pendingActions.BUS2 !== undefined,
     },
     busTeam,
-    subwayMoveTeams,
-    pendingSubwayMoves,
+    subwayControllers: {
+      BUS1: bus1Player
+        ? { playerId: bus1Player.id, playerName: bus1Player.name, team: bus1Player.team }
+        : null,
+      BUS2: bus2Player
+        ? { playerId: bus2Player.id, playerName: bus2Player.name, team: bus2Player.team }
+        : null,
+    },
+    pendingSubwayMoves: {
+      BUS1: !!room.pendingSubwayMoves?.BUS1,
+      BUS2: !!room.pendingSubwayMoves?.BUS2,
+    },
     ...getRoomTimingMeta(record),
   };
 }
@@ -90,10 +95,14 @@ function getActivePlayerNames(room: RoomState): string | null {
     if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
       names.push(`${bus2Player.name}(BUS2)`);
     }
-    for (const team of getSubwayMoveTeams(room.game)) {
-      if (!room.pendingSubwayMoves?.[team]) {
-        names.push(`${team}팀(지하철)`);
-      }
+    if (bus1Player && !room.pendingSubwayMoves?.[BusType.BUS1]) {
+      names.push(`${bus1Player.name}(지하철1)`);
+    }
+    if (
+      bus2Player &&
+      !room.pendingSubwayMoves?.[BusType.BUS2]
+    ) {
+      names.push(`${bus2Player.name}(지하철2)`);
     }
   } else if (room.status === "ACTION_PHASE") {
     if (bus1Player && room.pendingActions.BUS1 === undefined) {
@@ -105,6 +114,12 @@ function getActivePlayerNames(room: RoomState): string | null {
       bus2Player.id !== bus1Player?.id
     ) {
       names.push(`${bus2Player.name}(BUS2)`);
+    }
+    if (bus1Player && !room.pendingSubwayMoves?.[BusType.BUS1]) {
+      names.push(`${bus1Player.name}(지하철1)`);
+    }
+    if (bus2Player && !room.pendingSubwayMoves?.[BusType.BUS2]) {
+      names.push(`${bus2Player.name}(지하철2)`);
     }
   }
 
@@ -151,22 +166,24 @@ function getVisiblePrivateHand(room: RoomState, playerId?: string): Card[] {
   }
 
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
-  if (
-    room.status !== "CHOOSING" ||
-    bus1Player?.id !== playerId ||
-    bus2Player?.id !== playerId ||
-    !room.pendingMoves.BUS1 ||
-    room.pendingMoves.BUS2
-  ) {
+  if (room.status !== "CHOOSING") {
     return player.hand;
   }
 
-  // 한 사람이 두 버스를 모두 조작할 때 BUS1 제출 후 남은 손패만 보여줍니다.
   const hand = [...player.hand];
-  for (const move of room.pendingMoves.BUS1) {
-    if (move.cardIndex >= 0 && move.cardIndex < hand.length) {
-      hand.splice(move.cardIndex, 1);
+  const pendingActions = [
+    bus1Player?.id === playerId ? room.pendingMoves.BUS1 : undefined,
+    bus2Player?.id === playerId ? room.pendingMoves.BUS2 : undefined,
+  ];
+
+  for (const moves of pendingActions) {
+    if (!moves) continue;
+    for (const move of moves) {
+      if (move.cardIndex >= 0 && move.cardIndex < hand.length) {
+        hand.splice(move.cardIndex, 1);
+      }
     }
   }
+
   return hand;
 }
