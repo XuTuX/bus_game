@@ -38,7 +38,20 @@ export type {
 const roomTtlSeconds = 12 * 60 * 60;
 const SAVE_RETRY_LIMIT = 5;
 
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.REDIS_URL?.trim();
+const redisRestUrl = (
+  process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL
+)?.trim();
+const redisRestToken = (
+  process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN
+)?.trim();
+
+type LocalRedisEntry = {
+  value: string;
+  expiresAt: number;
+};
+
+const localRedisStore = getLocalRedisStore();
 
 // Redis에 문자열로 보내는 Lua 스크립트입니다. redis.call은 Redis 서버 안에서 실행됩니다.
 const REDIS_SAVE_IF_VERSION_SCRIPT = `
@@ -348,14 +361,117 @@ async function saveRoomRecord(
 }
 
 async function redisCommand<T>(command: unknown[]): Promise<T> {
-
   if (redisUrl) {
     return redisUrlCommand<T>(redisUrl, command);
   }
 
+  if (redisRestUrl && redisRestToken) {
+    return redisRestCommand<T>(redisRestUrl, redisRestToken, command);
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return localRedisCommand<T>(command);
+  }
+
   throw new Error(
-    "Redis 환경변수가 설정되지 않았습니다. UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN 또는 REDIS_URL이 필요합니다."
+    "Redis 환경변수가 설정되지 않았습니다. REDIS_URL 또는 UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN이 필요합니다."
   );
+}
+
+function getLocalRedisStore(): Map<string, LocalRedisEntry> {
+  const globalStore = globalThis as typeof globalThis & {
+    __busGameLocalRedisStore?: Map<string, LocalRedisEntry>;
+  };
+  globalStore.__busGameLocalRedisStore ??= new Map<string, LocalRedisEntry>();
+  return globalStore.__busGameLocalRedisStore;
+}
+
+async function localRedisCommand<T>(command: unknown[]): Promise<T> {
+  const [operation, ...args] = command;
+  const op = String(operation).toUpperCase();
+
+  if (op === "GET") {
+    const key = String(args[0]);
+    return getLocalRedisValue(key) as T;
+  }
+
+  if (op === "SET") {
+    const [keyArg, valueArg, ...options] = args;
+    const key = String(keyArg);
+    const value = String(valueArg);
+    const optionLabels = options.map((option) => String(option).toUpperCase());
+    const nx = optionLabels.includes("NX");
+    const ttl = getLocalRedisTtlSeconds(options);
+
+    pruneLocalRedisKey(key);
+    if (nx && localRedisStore.has(key)) {
+      return null as T;
+    }
+
+    localRedisStore.set(key, {
+      value,
+      expiresAt: Date.now() + ttl * 1000,
+    });
+    return "OK" as T;
+  }
+
+  if (op === "EVAL") {
+    const [, keyCountArg, ...evalArgs] = args;
+    const keyCount = Number(keyCountArg);
+    if (keyCount !== 1) {
+      throw new Error("로컬 Redis fallback은 단일 키 EVAL만 지원합니다.");
+    }
+
+    const [keyArg, expectedVersionArg, recordArg, ttlArg] = evalArgs;
+    const key = String(keyArg);
+    const expectedVersion = String(expectedVersionArg);
+    const nextRecord = String(recordArg);
+    const ttl = Number(ttlArg);
+    const current = getLocalRedisValue(key);
+
+    if (!current) {
+      if (expectedVersion !== "-1") {
+        return 0 as T;
+      }
+    } else {
+      const currentVersion = String((JSON.parse(current) as RoomRecord).version);
+      if (currentVersion !== expectedVersion) {
+        return 0 as T;
+      }
+    }
+
+    localRedisStore.set(key, {
+      value: nextRecord,
+      expiresAt: Date.now() + ttl * 1000,
+    });
+    return 1 as T;
+  }
+
+  throw new Error(`로컬 Redis fallback이 지원하지 않는 명령입니다: ${op}`);
+}
+
+function getLocalRedisTtlSeconds(options: unknown[]): number {
+  for (let index = 0; index < options.length; index += 1) {
+    if (String(options[index]).toUpperCase() === "EX") {
+      const ttl = Number(options[index + 1]);
+      if (Number.isFinite(ttl) && ttl > 0) {
+        return ttl;
+      }
+    }
+  }
+  return roomTtlSeconds;
+}
+
+function getLocalRedisValue(key: string): string | null {
+  pruneLocalRedisKey(key);
+  return localRedisStore.get(key)?.value ?? null;
+}
+
+function pruneLocalRedisKey(key: string) {
+  const entry = localRedisStore.get(key);
+  if (entry && entry.expiresAt <= Date.now()) {
+    localRedisStore.delete(key);
+  }
 }
 
 async function redisRestCommand<T>(
