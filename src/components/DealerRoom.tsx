@@ -486,6 +486,9 @@ export default function DealerRoom({
             showFacing={!!animatedGame}
             showFacingFor={activeBusType}
           />
+          <div className="dealer-scoreboard-wrapper">
+            <ScoreBoard game={game} showBusStatus={false} />
+          </div>
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
@@ -863,10 +866,6 @@ export default function DealerRoom({
                 )}
               </>
             )}
-          </section>
-
-          <section className="dealer-panel">
-            <ScoreBoard game={game} showBusStatus={false} />
           </section>
         </div>
       </main>
