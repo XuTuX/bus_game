@@ -2280,6 +2280,11 @@ h1, h2, h3, .brand-font {
   border-radius: 999px !important;
 }
 
+.bus-marker-dimmed {
+  opacity: 0.42;
+  filter: grayscale(0.35);
+}
+
 /* Obstacle classes */
 .tile-has-obstacle {
   background: var(--bg-tertiary) !important;
@@ -2939,5 +2944,4 @@ h1, h2, h3, .brand-font {
 .board-score-popup-bonus .board-score-popup-score {
   border: 2px solid #ffd700;
 }
-
 

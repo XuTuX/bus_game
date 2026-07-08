@@ -140,7 +140,9 @@ export default function AdminPage({
   const areSubwaysSubmitted =
     subwaySubmissionValues.length === 0 || subwaySubmissionValues.every(Boolean);
   const canEndTurn =
-    status === "ACTION_PHASE" &&
+    (status === "CHOOSING" || status === "ACTION_PHASE") &&
+    !!state.pendingMoves?.BUS1 &&
+    !!state.pendingMoves?.BUS2 &&
     !!state.pendingActions?.BUS1 &&
     !!state.pendingActions?.BUS2;
   const timerButtonLabel =

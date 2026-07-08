@@ -217,7 +217,6 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
             game={game}
             showFacing={false}
             showFacingFor={selectedSubway}
-            subwayPreview={subwayPreview}
           />
         </section>
 

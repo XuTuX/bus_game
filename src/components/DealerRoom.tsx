@@ -138,6 +138,12 @@ export default function DealerRoom({
     selectedBus === BusType.BUS1 ? isBus1Submitted : isBus2Submitted;
   const isSelectedActionSubmitted =
     selectedBus === BusType.BUS1 ? isBus1ActionSubmitted : isBus2ActionSubmitted;
+  const canSubmitSelectedMove =
+    publicState?.status === "CHOOSING" && !isSelectedMoveSubmitted;
+  const canSubmitSelectedAction =
+    (publicState?.status === "CHOOSING" || publicState?.status === "ACTION_PHASE") &&
+    isSelectedMoveSubmitted &&
+    !isSelectedActionSubmitted;
 
   // Auto-lock chosenBus based on role authority
   useEffect(() => {
@@ -172,7 +178,7 @@ export default function DealerRoom({
     setActionTarget(null);
     setErrorMsg("");
     setAnimatedGame(null);
-    if (publicState?.status === "ACTION_PHASE") {
+    if (publicState?.status === "ACTION_PHASE" || canSubmitSelectedAction) {
       setSelectedActionType("SWAP_TILE");
     } else {
       setSelectedActionType(null);
@@ -180,7 +186,7 @@ export default function DealerRoom({
     if (publicState?.status !== "CHOOSING") {
       setSubmittedPreviewGame(null);
     }
-  }, [resolvedPlayerId, publicState?.status]);
+  }, [resolvedPlayerId, publicState?.status, canSubmitSelectedAction]);
 
   if (!publicState || !publicState.game) {
     return (
@@ -193,6 +199,7 @@ export default function DealerRoom({
   }
 
   const game = publicState.game as GameState;
+  const dealerPreviewGame = privateState?.previewGame as GameState | undefined;
   const { status } = publicState;
   const activePlayer = game.players.find((player) => player.id === resolvedPlayerId);
   const hand = privateState?.hand ?? [];
@@ -216,8 +223,7 @@ export default function DealerRoom({
   const canAct =
     privateState?.isMyTurn &&
     isSelectedBusController &&
-    ((status === "CHOOSING" && !isSelectedMoveSubmitted) ||
-      (status === "ACTION_PHASE" && !isSelectedActionSubmitted));
+    (canSubmitSelectedMove || canSubmitSelectedAction);
   const bus1Disabled =
     !!roomBus ||
     submitting ||
@@ -250,21 +256,21 @@ export default function DealerRoom({
         ? BusType.BUS2
         : chosenBus);
   const displayGame =
-    animatedGame || (status === "CHOOSING" ? submittedPreviewGame : null) || game;
+    animatedGame || dealerPreviewGame || submittedPreviewGame || game;
   const activeBusPos = displayGame.buses[activeBusType].pos;
   const roomBusLabel = selectedBus === BusType.BUS1 ? "1번 버스" : "2번 버스";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
 
   // Generate cells centered at the active bus position
   const gridCells = [];
-  if (status === "ACTION_PHASE") {
+  if (canSubmitSelectedAction || status === "ACTION_PHASE") {
     const radius = 1;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         const tx = activeBusPos.x + dx;
         const ty = activeBusPos.y + dy;
-        const inBounds = tx >= 0 && tx < game.board.length && ty >= 0 && ty < game.board.length;
-        const tile = inBounds ? game.board[ty][tx] : null;
+        const inBounds = tx >= 0 && tx < displayGame.board.length && ty >= 0 && ty < displayGame.board.length;
+        const tile = inBounds ? displayGame.board[ty][tx] : null;
         gridCells.push({ dx, dy, tx, ty, tile, inBounds });
       }
     }
@@ -337,7 +343,13 @@ export default function DealerRoom({
 
   // Handle Action submission (transitions turn to next player)
   const handleActionSubmit = async () => {
-    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !selectedActionType || !canAct) return;
+    if (
+      !resolvedPlayerId ||
+      (status !== "CHOOSING" && status !== "ACTION_PHASE") ||
+      !selectedActionType ||
+      !canAct ||
+      !canSubmitSelectedAction
+    ) return;
     if (selectedActionType === "SWAP_TILE" && !actionTarget) return;
     setSubmitting(true);
     setErrorMsg("");
@@ -397,7 +409,7 @@ export default function DealerRoom({
             game={displayGame}
             showFacing={!!animatedGame}
             showFacingFor={activeBusType}
-            visibleBuses={roomBus ? [activeBusType] : undefined}
+            focusBus={activeBusType}
           />
           <div className="dealer-scoreboard-wrapper">
             <ScoreBoard game={game} showBusStatus={false} />
@@ -429,7 +441,7 @@ export default function DealerRoom({
                 <h3 className="brand-font">딜러룸 대기</h3>
                 <p>마스터 페이지에서 사람을 입력하고 게임을 시작하면 현재 차례의 카드패가 여기에 표시됩니다.</p>
               </div>
-            ) : status === "CHOOSING" && hasISubmittedMoves ? (
+            ) : status === "CHOOSING" && hasISubmittedMoves && !canSubmitSelectedAction ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font" style={{ color: "var(--bus1-color)" }}>이동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>다른 버스의 이동 카드 제출을 기다리고 있습니다...</p>
@@ -438,7 +450,7 @@ export default function DealerRoom({
                   <span>2번 버스 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
               </div>
-            ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
+            ) : (status === "CHOOSING" || status === "ACTION_PHASE") && hasISubmittedAction ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font" style={{ color: "var(--bus2-color)" }}>행동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>
@@ -462,7 +474,7 @@ export default function DealerRoom({
               </div>
             ) : (
               <>
-                {status === "CHOOSING" ? (
+                {canSubmitSelectedMove ? (
                   <>
                     <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
                       <h3 className="brand-font" style={{ fontSize: "1.1rem" }}>단계 1: 이동 카드 선택</h3>

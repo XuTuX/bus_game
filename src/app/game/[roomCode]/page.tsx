@@ -148,7 +148,7 @@ export default function PublicBoardPage({
           <h2 className="brand-font">버스 보드판</h2>
         </div>
         <div className="board-result-wrapper">
-          <Board game={game} subwayPreview={subwayPreview} />
+          <Board game={game} />
         </div>
       </main>
 

@@ -23,12 +23,14 @@ export default function Board({
   showFacing = false,
   showFacingFor,
   visibleBuses,
+  focusBus,
   subwayPreview,
 }: {
   game: GameState;
   showFacing?: boolean;
   showFacingFor?: BusType;
   visibleBuses?: BusType[];
+  focusBus?: BusType;
   subwayPreview?: {
     path: Coord[];
     finalPositions: Coord[];
@@ -206,6 +208,8 @@ export default function Board({
             key={busType}
             className={`bus-marker bus-marker-${busType} ${
               !shouldShowFacing ? "bus-marker-round" : ""
+            } ${
+              focusBus && focusBus !== typedBusType ? "bus-marker-dimmed" : ""
             }`}
             style={{
               left: left + offset,

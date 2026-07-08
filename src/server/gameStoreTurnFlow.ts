@@ -89,10 +89,15 @@ export function submitTurnToRoom(
     throw new Error("한 명이 두 버스를 조작할 때는 BUS1 이동을 먼저 제출해야 합니다.");
   }
 
-  if (room.status === "CHOOSING") {
+  const firstAction = actions[0];
+  const isActionSubmission = firstAction?.type === "SWAP_TILE";
+
+  if (isActionSubmission) {
+    submitActionPhase(room, firstAction as ActionPhaseTurnAction | undefined, bus);
+  } else if (room.status === "CHOOSING") {
     submitMovePhase(room, actions as MoveTurnAction[], bus);
   } else {
-    submitActionPhase(room, actions[0] as ActionPhaseTurnAction | undefined, bus);
+    throw new Error("이동 제출 단계가 아닙니다.");
   }
 }
 
@@ -104,15 +109,24 @@ function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusTyp
   }
 
   if (bus === BusType.BUS1) {
+    if (room.pendingMoves.BUS1) {
+      throw new Error("BUS1 이동은 이미 제출되었습니다.");
+    }
     room.pendingMoves.BUS1 = actions;
   } else {
+    if (room.pendingMoves.BUS2) {
+      throw new Error("BUS2 이동은 이미 제출되었습니다.");
+    }
     room.pendingMoves.BUS2 = actions;
   }
 
   if (!bus1Player) room.pendingMoves.BUS1 = [];
   if (!bus2Player) room.pendingMoves.BUS2 = [];
 
-  resolveMovePhaseIfReady(room);
+  if (room.pendingMoves.BUS1 && room.pendingMoves.BUS2) {
+    room.status = "ACTION_PHASE";
+    startPhaseTimer(room, getRoomTimerSettings(room).actionPhaseSeconds);
+  }
 }
 
 function submitSubwayMovePhase(
@@ -173,73 +187,6 @@ function submitSubwayMovePhase(
   }
 }
 
-function resolveMovePhaseIfReady(room: RoomState) {
-  const { bus1Player, bus2Player } = getTurnControllers(room.game);
-  room.pendingSubwayMoves ??= {};
-
-  if (!bus1Player) room.pendingMoves.BUS1 = [];
-  if (!bus2Player) room.pendingMoves.BUS2 = [];
-
-  if (!room.pendingMoves.BUS1 || !room.pendingMoves.BUS2) {
-    return;
-  }
-
-  const clone = deepClone(room.game);
-  clone.swappedTiles = [];
-  const actionDetails: LogEntry["actions"] = [];
-
-  if (bus1Player) {
-    appendMoveLogActions(
-      actionDetails,
-      clone,
-      bus1Player.id,
-      room.pendingMoves.BUS1,
-      BusType.BUS1
-    );
-  }
-
-  if (bus2Player) {
-    appendMoveLogActions(
-      actionDetails,
-      clone,
-      bus2Player.id,
-      room.pendingMoves.BUS2,
-      BusType.BUS2
-    );
-  }
-
-  const beforeDestinationBonus = { ...clone.teamScores };
-  const { busTeam } = getTurnControllers(clone);
-  scoreMatchingBusDestinationBonus(
-    clone,
-    [busTeam]
-  );
-  appendScoreDeltaLogActions(
-    actionDetails,
-    beforeDestinationBonus,
-    clone.teamScores,
-    "두 버스 같은 색 도착 보너스"
-  );
-
-  const beforeDistanceScores = { ...clone.teamScores };
-  const distancePenalty = scoreBusDistancePenalty(clone, busTeam);
-  appendScoreDeltaLogActions(
-    actionDetails,
-    beforeDistanceScores,
-    clone.teamScores,
-    distancePenalty
-      ? `버스 간 거리 ${distancePenalty.distance}칸 감점`
-      : "버스 간 거리 감점"
-  );
-
-  addTurnLog(room, actionDetails, room.game.roundIndex + 1, room.game.turnIndex + 1, "MOVE");
-
-  room.game = clone;
-  room.status = "ACTION_PHASE";
-  room.pendingMoves = {};
-  startPhaseTimer(room, getRoomTimerSettings(room).actionPhaseSeconds);
-}
-
 function submitActionPhase(
   room: RoomState,
   action: ActionPhaseTurnAction | undefined,
@@ -249,6 +196,13 @@ function submitActionPhase(
 
   if (!action) {
     throw new Error("버스 행동은 패스할 수 없습니다. 교환할 타일을 선택해 제출하세요.");
+  }
+
+  if (bus === BusType.BUS1 && !room.pendingMoves.BUS1) {
+    throw new Error("BUS1 이동 제출 후 행동을 제출할 수 있습니다.");
+  }
+  if (bus === BusType.BUS2 && !room.pendingMoves.BUS2) {
+    throw new Error("BUS2 이동 제출 후 행동을 제출할 수 있습니다.");
   }
 
   if (bus === BusType.BUS1) {
@@ -264,16 +218,21 @@ function submitActionPhase(
 }
 
 export function finalizeTurnResult(room: RoomState) {
-  if (room.status !== "ACTION_PHASE") {
-    throw new Error("행동 단계에서만 이번 턴을 종료할 수 있습니다.");
+  if (room.status !== "CHOOSING" && room.status !== "ACTION_PHASE") {
+    throw new Error("입력 단계에서만 이번 턴을 종료할 수 있습니다.");
   }
 
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
   room.pendingSubwayMoves ??= {};
 
+  if (!bus1Player) room.pendingMoves.BUS1 = [];
+  if (!bus2Player) room.pendingMoves.BUS2 = [];
   if (!bus1Player) room.pendingActions.BUS1 = null;
   if (!bus2Player) room.pendingActions.BUS2 = null;
 
+  if (!room.pendingMoves.BUS1 || !room.pendingMoves.BUS2) {
+    throw new Error("아직 두 버스의 이동 제출이 끝나지 않았습니다.");
+  }
   if (
     room.pendingActions.BUS1 === undefined ||
     room.pendingActions.BUS2 === undefined
@@ -282,6 +241,51 @@ export function finalizeTurnResult(room: RoomState) {
   }
 
   const clone = deepClone(room.game);
+  clone.swappedTiles = [];
+  const moveDetails: LogEntry["actions"] = [];
+
+  if (bus1Player) {
+    appendMoveLogActions(
+      moveDetails,
+      clone,
+      bus1Player.id,
+      room.pendingMoves.BUS1,
+      BusType.BUS1
+    );
+  }
+
+  if (bus2Player) {
+    appendMoveLogActions(
+      moveDetails,
+      clone,
+      bus2Player.id,
+      room.pendingMoves.BUS2,
+      BusType.BUS2
+    );
+  }
+
+  const beforeDestinationBonus = { ...clone.teamScores };
+  const { busTeam } = getTurnControllers(clone);
+  scoreMatchingBusDestinationBonus(clone, [busTeam]);
+  appendScoreDeltaLogActions(
+    moveDetails,
+    beforeDestinationBonus,
+    clone.teamScores,
+    "두 버스 같은 색 도착 보너스"
+  );
+
+  const beforeDistanceScores = { ...clone.teamScores };
+  const distancePenalty = scoreBusDistancePenalty(clone, busTeam);
+  appendScoreDeltaLogActions(
+    moveDetails,
+    beforeDistanceScores,
+    clone.teamScores,
+    distancePenalty
+      ? `버스 간 거리 ${distancePenalty.distance}칸 감점`
+      : "버스 간 거리 감점"
+  );
+  addTurnLog(room, moveDetails, room.game.roundIndex + 1, room.game.turnIndex + 1, "MOVE");
+
   const actionDetails: LogEntry["actions"] = [];
 
   if (bus1Player) {
@@ -334,6 +338,7 @@ export function finalizeTurnResult(room: RoomState) {
   room.game = clone;
   room.status = "RESULT_PHASE";
   clearPhaseTimer(room);
+  room.pendingMoves = {};
   room.pendingActions = {};
   room.pendingSubwayMoves = {};
   room.subwaySubmissionCounter = 0;

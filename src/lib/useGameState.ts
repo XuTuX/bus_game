@@ -60,6 +60,7 @@ export type PublicStateResult = {
 
 export type PrivateStateResult = {
   hand: Card[];
+  previewGame?: RoomState["game"];
   isMyTurn: boolean;
   status: RoomState["status"];
   team?: Colour;

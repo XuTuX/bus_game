@@ -1,5 +1,7 @@
 import {
   BusType,
+  runActionPhase,
+  runMovePhase,
   stepSubway,
   type Card,
   type CardKind,
@@ -79,6 +81,7 @@ export function buildPrivateState(record: RoomRecord, playerId: string) {
 
   return {
     hand: getVisiblePrivateHand(room, stablePlayerId),
+    previewGame: buildDealerPreviewGame(room),
     isMyTurn: isCurrentPlayerTurn(room, stablePlayerId),
     isBus1Controller,
     isBus2Controller,
@@ -98,9 +101,19 @@ function getActivePlayerNames(room: RoomState): string | null {
   const names: string[] = [];
 
   if (room.status === "CHOOSING") {
-    if (bus1Player && !room.pendingMoves.BUS1) names.push(`${bus1Player.name}(BUS1)`);
-    if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
-      names.push(`${bus2Player.name}(BUS2)`);
+    if (bus1Player) {
+      if (!room.pendingMoves.BUS1) {
+        names.push(`${bus1Player.name}(BUS1 이동)`);
+      } else if (room.pendingActions.BUS1 === undefined) {
+        names.push(`${bus1Player.name}(BUS1 행동)`);
+      }
+    }
+    if (bus2Player && bus2Player.id !== bus1Player?.id) {
+      if (!room.pendingMoves.BUS2) {
+        names.push(`${bus2Player.name}(BUS2 이동)`);
+      } else if (room.pendingActions.BUS2 === undefined) {
+        names.push(`${bus2Player.name}(BUS2 행동)`);
+      }
     }
   } else if (room.status === "ACTION_PHASE") {
     if (bus1Player && room.pendingActions.BUS1 === undefined) {
@@ -126,7 +139,20 @@ function isCurrentPlayerTurn(room: RoomState, playerId?: string) {
   if (room.status === "CHOOSING") {
     const bus1NeedsToSubmit = isBus1Controller && !room.pendingMoves.BUS1;
     const bus2NeedsToSubmit = isBus2Controller && !room.pendingMoves.BUS2;
-    return bus1NeedsToSubmit || bus2NeedsToSubmit;
+    const bus1ActionNeedsToSubmit =
+      isBus1Controller &&
+      !!room.pendingMoves.BUS1 &&
+      room.pendingActions.BUS1 === undefined;
+    const bus2ActionNeedsToSubmit =
+      isBus2Controller &&
+      !!room.pendingMoves.BUS2 &&
+      room.pendingActions.BUS2 === undefined;
+    return (
+      bus1NeedsToSubmit ||
+      bus2NeedsToSubmit ||
+      bus1ActionNeedsToSubmit ||
+      bus2ActionNeedsToSubmit
+    );
   }
 
   if (room.status === "ACTION_PHASE") {
@@ -138,6 +164,45 @@ function isCurrentPlayerTurn(room: RoomState, playerId?: string) {
   }
 
   return false;
+}
+
+function buildDealerPreviewGame(room: RoomState) {
+  if (room.status !== "CHOOSING" && room.status !== "ACTION_PHASE") {
+    return undefined;
+  }
+
+  const clone = deepClone(room.game);
+  const { bus1Player, bus2Player } = getTurnControllers(clone);
+
+  if (bus1Player && room.pendingMoves.BUS1) {
+    const player = clone.players.find((p) => p.id === bus1Player.id);
+    if (player) {
+      runMovePhase(player, room.pendingMoves.BUS1, clone, { scoreSubwaysAtEnd: false });
+    }
+  }
+
+  if (bus2Player && room.pendingMoves.BUS2) {
+    const player = clone.players.find((p) => p.id === bus2Player.id);
+    if (player) {
+      runMovePhase(player, room.pendingMoves.BUS2, clone, { scoreSubwaysAtEnd: false });
+    }
+  }
+
+  if (bus1Player && room.pendingActions.BUS1) {
+    const player = clone.players.find((p) => p.id === bus1Player.id);
+    if (player) {
+      runActionPhase(player, room.pendingActions.BUS1, clone);
+    }
+  }
+
+  if (bus2Player && room.pendingActions.BUS2) {
+    const player = clone.players.find((p) => p.id === bus2Player.id);
+    if (player) {
+      runActionPhase(player, room.pendingActions.BUS2, clone);
+    }
+  }
+
+  return clone;
 }
 
 function getRoomTimingMeta(record: RoomRecord): RoomTimingMeta {
