@@ -104,6 +104,7 @@ export interface StepResult {
   regions: Region[];
   path?: Coord[];
   scoreGained?: number;
+  scoreChanges?: Partial<Record<Colour, number>>;
   logs?: string[];
   collisionPenalty?: boolean;
 }
@@ -443,6 +444,8 @@ export function runMovePhase(
       
       // Handle path scoring and arrivals
       let gained = 0;
+      const scoreChanges: Partial<Record<Colour, number>> = {};
+      
       if (result.applied && result.path && result.path.length > 0) {
         for (const coord of result.path) {
           const tile = game.board[coord.y]?.[coord.x];
@@ -450,15 +453,18 @@ export function runMovePhase(
           
           const score = 1 + (tile.scoreBonus ?? 0);
           game.teamScores[tile.colour] += score;
+          scoreChanges[tile.colour] = (scoreChanges[tile.colour] ?? 0) + score;
           gained += score;
 
         }
       }
       if (result.collisionPenalty) {
         game.teamScores[player.team] -= 3;
+        scoreChanges[player.team] = (scoreChanges[player.team] ?? 0) - 3;
         gained -= 3;
       }
       result.scoreGained = gained;
+      result.scoreChanges = scoreChanges;
       // Distance Penalty moved to end of turn
     }
     
@@ -659,15 +665,15 @@ export function colourSymbol(colour: Colour | null): string {
 export function cardLabel(card: Card): string {
   switch (card.kind) {
     case "STRAIGHT1":
-      return "S1";
+      return "직진 1칸";
     case "STRAIGHT2":
-      return "S2";
+      return "직진 2칸";
     case "STRAIGHT3":
-      return "S3";
+      return "직진 3칸";
     case "LEFT":
-      return "L";
+      return "좌회전";
     case "RIGHT":
-      return "R";
+      return "우회전";
   }
 }
 

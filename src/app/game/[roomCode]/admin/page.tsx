@@ -661,9 +661,10 @@ function getBusSubmissionState(
 function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
   if (!logs || logs.length === 0) return null;
 
-  // Group logs by Round and Turn
+  // Group logs by Round and Turn using the Team as header
   const groupedLogs = logs.reduce((acc, log) => {
-    const key = `R${log.round} T${log.turn}`;
+    const teamLabel = TEAM_LABELS[log.team as Colour] ? `${TEAM_LABELS[log.team as Colour]}팀` : log.team;
+    const key = `라운드 ${log.round} ${teamLabel}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(log);
     return acc;
@@ -674,30 +675,34 @@ function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
       <div className="panel-title-row">
         <h2 className="brand-font">이전 턴 점수 기록</h2>
       </div>
-      <div className="turn-history-feed" style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, paddingRight: 4 }}>
+      <div className="turn-history-feed" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
         {Object.entries(groupedLogs).map(([key, groupLogs]) => {
+          // Sort group logs so MOVE phase comes before ACTION phase
+          groupLogs.sort((a, b) => (a.phase === "MOVE" ? -1 : 1));
           const allActions = groupLogs.flatMap(l => l.actions);
-          const scoreActions = allActions.filter(a => a.scoreGained !== 0);
           
-          if (scoreActions.length === 0) return null;
+          if (allActions.length === 0) return null;
           
           return (
-            <div key={key} className="turn-history-group" style={{ background: "rgba(20, 20, 35, 0.5)", padding: 12, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.6)", marginBottom: 8, fontWeight: "bold" }}>{key}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {scoreActions.map((action, idx) => {
-                  const [label, teamStr] = action.actionLabel.split(": ");
-                  const teamLabel = teamStr && TEAM_LABELS[teamStr as Colour] ? `${TEAM_LABELS[teamStr as Colour]}팀` : "";
+            <div key={key} className="turn-history-group" style={{ background: "var(--bg-secondary)", padding: 16, borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-sm)" }}>
+              <div style={{ fontSize: "1.1rem", color: "var(--text-secondary)", marginBottom: 12, fontWeight: "bold", fontFamily: "Fredoka, sans-serif" }}>{key}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {allActions.map((action, idx) => {
+                  const isBusMove = !action.actionLabel.startsWith("지하철") && !action.actionLabel.includes("점수") && !action.actionLabel.includes("보너스") && !action.actionLabel.includes("감점") && !action.actionLabel.includes("타일") && !action.actionLabel.includes("페널티");
+                  const busPrefix = isBusMove ? (action.bus === "BUS1" ? "버스 1 " : "버스 2 ") : "";
                   
                   return (
-                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", alignItems: "center" }}>
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "1rem", padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
                       <span>
-                        {teamLabel && <strong style={{ color: TEAM_COLOUR_VARS[teamStr as Colour], marginRight: 6 }}>{teamLabel}</strong>}
-                        {teamLabel ? label : action.actionLabel}
+                        {busPrefix && <strong style={{ color: action.bus === "BUS1" ? "var(--bus1-color)" : "var(--bus2-color)", marginRight: 4 }}>{busPrefix.trim()}</strong>}
+                        {busPrefix ? " " : ""}
+                        {action.actionLabel}
                       </span>
-                      <strong style={{ color: action.scoreGained > 0 ? "var(--team-green)" : "var(--team-red)" }}>
-                        {action.scoreGained > 0 ? "+" : ""}{action.scoreGained}점
-                      </strong>
+                      {action.scoreGained !== 0 && (
+                        <strong style={{ color: action.scoreGained > 0 ? "var(--team-blue)" : "var(--team-red)", flexShrink: 0, marginLeft: 8 }}>
+                          {action.scoreGained > 0 ? "+" : ""}{action.scoreGained}점
+                        </strong>
+                      )}
                     </div>
                   );
                 })}

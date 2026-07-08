@@ -7,6 +7,7 @@ import {
   scoreMatchingBusDestinationBonus,
   scoreSubwayTiles,
   type Card,
+  type Colour,
   type GameState,
   type MoveTurnAction,
   type TurnAction,
@@ -28,6 +29,15 @@ import {
   getSubwayMoveTeams,
   getTurnControllers,
 } from "./gameStoreUtils";
+
+const TEAM_NAMES_KO: Record<string, string> = {
+  Red: "레드팀",
+  Purple: "퍼플팀",
+  Yellow: "옐로팀",
+  Green: "그린팀",
+  Blue: "블루팀",
+};
+
 
 export function submitTurnToRoom(
   room: RoomState,
@@ -308,14 +318,27 @@ export function finalizeTurnResult(room: RoomState) {
     );
   }
 
-  const beforeRegionScores = { ...clone.teamScores };
-  scoreCurrentBusRegions(clone);
-  appendScoreDeltaLogActions(
-    actionDetails,
-    beforeRegionScores,
-    clone.teamScores,
-    "버스 도착 칸 영역 점수"
-  );
+  const regionGains = scoreCurrentBusRegions(clone);
+  
+  if (regionGains.BUS1) {
+    const tName = TEAM_NAMES_KO[regionGains.BUS1.team] || regionGains.BUS1.team;
+    actionDetails.push({
+      actionLabel: `버스 1 영역점수 : ${tName.replace("팀", "")} +${regionGains.BUS1.size}`,
+      bus: BusType.BUS1,
+      applied: true,
+      scoreGained: 0,
+    });
+  }
+
+  if (regionGains.BUS2) {
+    const tName = TEAM_NAMES_KO[regionGains.BUS2.team] || regionGains.BUS2.team;
+    actionDetails.push({
+      actionLabel: `버스 2 영역점수 : ${tName.replace("팀", "")} +${regionGains.BUS2.size}`,
+      bus: BusType.BUS2,
+      applied: true,
+      scoreGained: 0,
+    });
+  }
 
   let subwayActionApplied = false;
   getOrderedSubwaySubmissions(room).forEach((submission) => {
@@ -357,12 +380,28 @@ function appendMoveLogActions(
 
   moves.forEach((move, index) => {
     const result = results[index];
+    let label = actionLabel(move, handCopy);
+    
+    if (result.scoreChanges && Object.keys(result.scoreChanges).length > 0) {
+      const parts: string[] = [];
+      for (const [team, delta] of Object.entries(result.scoreChanges)) {
+        if (delta === 0) continue;
+        const colorTeam = team as Colour;
+        const tName = TEAM_NAMES_KO[colorTeam] || colorTeam;
+        const dStr = delta > 0 ? `+${delta}` : `${delta}`;
+        parts.push(`${tName.replace("팀", "")} ${dStr}`);
+      }
+      if (parts.length > 0) {
+        label += ` : ${parts.join(", ")}`;
+      }
+    }
+
     actionDetails.push({
-      actionLabel: actionLabel(move, handCopy),
+      actionLabel: label,
       bus,
       applied: result.applied,
       reason: result.reason,
-      scoreGained: result.scoreGained ?? 0,
+      scoreGained: 0,
     });
   });
 
@@ -375,10 +414,11 @@ function appendSubwayLogAction(
 ): boolean {
   const player = game.players.find((p) => p.id === submission.playerId);
   const subwayLabel = "지하철";
+  const teamPrefix = player ? `${TEAM_NAMES_KO[player.team] || player.team} ` : "";
 
   if (!submission.action) {
     actionDetails.push({
-      actionLabel: `${subwayLabel} 패스`,
+      actionLabel: `${teamPrefix}${subwayLabel} 패스`,
       bus: BusType.BUS1,
       applied: true,
       scoreGained: 0,
@@ -388,7 +428,7 @@ function appendSubwayLogAction(
 
   if (!player) {
     actionDetails.push({
-      actionLabel: `${subwayLabel} 이동`,
+      actionLabel: `${teamPrefix}${subwayLabel} 이동`,
       bus: BusType.BUS1,
       applied: false,
       reason: "제출 플레이어를 찾을 수 없습니다.",
@@ -404,7 +444,7 @@ function appendSubwayLogAction(
 
   if (cardIndex < 0) {
     actionDetails.push({
-      actionLabel: `${subwayLabel} 이동`,
+      actionLabel: `${teamPrefix}${subwayLabel} 이동`,
       bus: BusType.BUS1,
       applied: false,
       reason: "제출한 이동 카드가 손패에 남아있지 않습니다.",
@@ -424,11 +464,11 @@ function appendSubwayLogAction(
   });
 
   actionDetails.push({
-    actionLabel: `${subwayLabel} ${subwayCardLabel(submission.cardKind)}`,
+    actionLabel: `지하철 ${subwayCardLabel(submission.cardKind)}`,
     bus: BusType.BUS1,
     applied: result.applied,
     reason: result.reason,
-    scoreGained: result.scoreGained ?? 0,
+    scoreGained: 0,
   });
   return result.applied;
 }
@@ -439,14 +479,21 @@ function appendScoreDeltaLogActions(
   afterScores: GameState["teamScores"],
   label: string
 ) {
+  const parts: string[] = [];
   for (const team of Object.keys(afterScores) as (keyof GameState["teamScores"])[]) {
     const delta = afterScores[team] - beforeScores[team];
     if (delta === 0) continue;
+    const colorTeam = team as Colour;
+    const tName = TEAM_NAMES_KO[colorTeam] || colorTeam;
+    parts.push(`${tName.replace("팀", "")} ${delta > 0 ? `+${delta}` : delta}`);
+  }
+  
+  if (parts.length > 0) {
     actionDetails.push({
-      actionLabel: `${label}: ${team}`,
+      actionLabel: `${label} : ${parts.join(", ")}`,
       bus: BusType.BUS1,
       applied: true,
-      scoreGained: delta,
+      scoreGained: 0,
     });
   }
 }
@@ -485,20 +532,11 @@ function appendActionLogAction(
   action: ActionPhaseTurnAction | null,
   bus: BusType
 ) {
-  if (!action) {
-    throw new Error("버스 행동 제출이 필요합니다.");
-  }
-
   const player = findClonePlayer(game, playerId);
-  const result = runActionPhase(player, action, game);
+  if (!action) return;
 
-  actionDetails.push({
-    actionLabel: actionPhaseLabel(action),
-    bus,
-    applied: result.applied,
-    reason: result.reason,
-    scoreGained: 0,
-  });
+  runActionPhase(player, action, game);
+  // Omit meaningless tile swap logs from the UI
 }
 
 function addTurnLog(
@@ -508,11 +546,11 @@ function addTurnLog(
   turn: number,
   phase: LogEntry["phase"]
 ) {
-  const { bus1Player, bus2Player } = getTurnControllers(room.game);
+  const { bus1Player, bus2Player, busTeam } = getTurnControllers(room.game);
   room.logs.unshift({
     id: ++room.logIdCounter,
     playerId: `${bus1Player?.name ?? "BUS1"} & ${bus2Player?.name ?? "BUS2"}`,
-    team: "Blue",
+    team: busTeam ?? "Blue",
     phase,
     actions,
     round,
@@ -529,6 +567,7 @@ function scoreCurrentBusRegions(game: GameState) {
   const bus1State = game.buses.BUS1;
   const bus1Size = getConnectedComponentSize(bus1State.pos, game.board, allWalls);
   const bus1Color = game.board[bus1State.pos.y]?.[bus1State.pos.x]?.colour;
+  const bus1Gained = bus1Color ? { team: bus1Color, size: bus1Size } : null;
   if (bus1Color) {
     game.teamScores[bus1Color] += bus1Size;
   }
@@ -536,9 +575,12 @@ function scoreCurrentBusRegions(game: GameState) {
   const bus2State = game.buses.BUS2;
   const bus2Size = getConnectedComponentSize(bus2State.pos, game.board, allWalls);
   const bus2Color = game.board[bus2State.pos.y]?.[bus2State.pos.x]?.colour;
+  const bus2Gained = bus2Color ? { team: bus2Color, size: bus2Size } : null;
   if (bus2Color) {
     game.teamScores[bus2Color] += bus2Size;
   }
+  
+  return { BUS1: bus1Gained, BUS2: bus2Gained };
 }
 
 function scoreBusDistancePenalty(game: GameState, team: GameState["players"][number]["team"]) {

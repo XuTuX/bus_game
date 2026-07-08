@@ -823,21 +823,19 @@ h1, h2, h3, .brand-font {
 .admin-main {
   display: grid;
   grid-template-columns: minmax(560px, auto) 1.15fr 1fr;
-  grid-template-rows: 1fr;
   gap: 18px;
-  height: calc(100vh - 76px);
-  max-height: calc(100vh - 76px);
-  min-height: 0;
-  overflow: hidden;
   width: min(1560px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 12px 0 20px;
+  padding: 12px 0 40px;
   align-items: stretch;
 }
 
+.admin-main .turn-history-panel {
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
 .admin-main .dealer-board-pane {
-  height: 100%;
-  min-height: 0;
   padding: 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
