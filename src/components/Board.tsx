@@ -54,13 +54,17 @@ export default function Board({
             );
             const hasObstacle = game.obstacles?.some(o => o.x === x && o.y === y);
             const isCenterBlocked = game.centerRulesActive && x === 4 && y === 4;
+            const hasBus1 = game.buses.BUS1?.pos.x === x && game.buses.BUS1?.pos.y === y;
+            const hasBus2 = game.buses.BUS2?.pos.x === x && game.buses.BUS2?.pos.y === y;
 
             return (
               <div
                 key={`${x}-${y}`}
                 className={`tile tile-${tile.colour ?? 'gray'}${
                   scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
-                } ${isSwapped ? "tile-swapped" : ""} ${isCenterBlocked ? "tile-center-blocked" : ""}`}
+                } ${isSwapped ? "tile-swapped" : ""} ${isCenterBlocked ? "tile-center-blocked" : ""}${
+                  hasBus1 ? " tile-has-bus1" : ""
+                }${hasBus2 ? " tile-has-bus2" : ""}`}
               >
                 {tile.scoreBonus ? (
                   <span className="tile-bonus">+{1 + tile.scoreBonus}</span>

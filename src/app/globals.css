@@ -2537,3 +2537,46 @@ h1, h2, h3, .brand-font {
   font-size: 0.95rem;
   font-weight: 700;
 }
+
+/* ─── Glowing Tile Highlights for Buses ─── */
+.tile-has-bus1 {
+  box-shadow: inset 0 0 0 3px var(--bus1-color), 0 0 14px var(--bus1-color) !important;
+  animation: tile-bus1-pulse 1.5s infinite alternate;
+}
+
+.tile-has-bus2 {
+  box-shadow: inset 0 0 0 3px var(--bus2-color), 0 0 14px var(--bus2-color) !important;
+  animation: tile-bus2-pulse 1.5s infinite alternate;
+}
+
+.tile-has-bus1.tile-has-bus2 {
+  box-shadow: inset 0 0 0 3px #ffeaa7, 0 0 16px rgba(255, 234, 167, 0.8) !important;
+  animation: tile-dual-pulse 1s infinite alternate;
+}
+
+@keyframes tile-bus1-pulse {
+  from {
+    box-shadow: inset 0 0 0 3px var(--bus1-color), 0 0 4px var(--bus1-glow) !important;
+  }
+  to {
+    box-shadow: inset 0 0 0 4px var(--bus1-color), 0 0 16px var(--bus1-color) !important;
+  }
+}
+
+@keyframes tile-bus2-pulse {
+  from {
+    box-shadow: inset 0 0 0 3px var(--bus2-color), 0 0 4px var(--bus2-glow) !important;
+  }
+  to {
+    box-shadow: inset 0 0 0 4px var(--bus2-color), 0 0 16px var(--bus2-color) !important;
+  }
+}
+
+@keyframes tile-dual-pulse {
+  from {
+    box-shadow: inset 0 0 0 3px #ffeaa7, 0 0 6px rgba(255, 234, 167, 0.5) !important;
+  }
+  to {
+    box-shadow: inset 0 0 0 4px #ffeaa7, 0 0 20px #ffeaa7 !important;
+  }
+}
