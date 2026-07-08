@@ -2,6 +2,7 @@ import {
   Colour,
   COLOURS,
   type CardKind,
+  Facing,
   MAX_PLAYERS,
   MAX_PLAYERS_PER_COLOUR,
   BusType,
@@ -429,7 +430,50 @@ function nextAvailableColour(participants: LobbyParticipant[]): Colour {
 async function readRoomRecord(roomCode: string): Promise<RoomRecord | null> {
   const normalizedRoomCode = normalizeRoomCode(roomCode);
   const raw = await redisCommand<string | null>(["GET", roomKey(normalizedRoomCode)]);
-  return raw ? (JSON.parse(raw) as RoomRecord) : null;
+  if (!raw) {
+    return null;
+  }
+
+  return hydrateRoomRecord(JSON.parse(raw) as RoomRecord);
+}
+
+function hydrateRoomRecord(record: RoomRecord): RoomRecord {
+  record.room.pendingMoves ??= {};
+  record.room.pendingActions ??= {};
+  record.room.pendingSubwayMoves ??= {};
+  record.room.subwaySubmissionCounter ??= 0;
+
+  const defaultBus1Subway = {
+    pos: [
+      { x: 5, y: 0 },
+      { x: 4, y: 0 },
+      { x: 3, y: 0 },
+      { x: 2, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 0 },
+    ],
+    facing: Facing.E,
+    active: true,
+  };
+  const defaultBus2Subway = {
+    pos: [],
+    facing: Facing.E,
+    active: false,
+  };
+
+  record.room.game.subways ??= {
+    [BusType.BUS1]: defaultBus1Subway,
+    [BusType.BUS2]: defaultBus2Subway,
+  };
+
+  const bus1Subway = record.room.game.subways[BusType.BUS1];
+  if (!bus1Subway || bus1Subway.pos.length === 0 || !bus1Subway.active) {
+    record.room.game.subways[BusType.BUS1] = defaultBus1Subway;
+  }
+
+  record.room.game.subways[BusType.BUS2] ??= defaultBus2Subway;
+
+  return record;
 }
 
 async function saveRoomRecord(

@@ -7,6 +7,17 @@ const FACING_ROTATION: Record<string, number> = {
   W: 180,
 };
 
+const DEFAULT_SUBWAY_POS: Coord[] = [
+  { x: 5, y: 0 },
+  { x: 4, y: 0 },
+  { x: 3, y: 0 },
+  { x: 2, y: 0 },
+  { x: 1, y: 0 },
+  { x: 0, y: 0 },
+];
+
+type SubwayDirection = "n" | "e" | "s" | "w";
+
 export default function Board({
   game,
   showFacing = false,
@@ -44,6 +55,24 @@ export default function Board({
     }
   }
 
+  const visibleSubwayPositions =
+    game.subways?.[BusType.BUS1]?.active && game.subways[BusType.BUS1].pos.length > 0
+      ? game.subways[BusType.BUS1].pos
+      : DEFAULT_SUBWAY_POS;
+  const subwayTiles = new Map(
+    visibleSubwayPositions.map((pos, index) => {
+      const connections = [
+        getSubwayDirection(pos, visibleSubwayPositions[index - 1]),
+        getSubwayDirection(pos, visibleSubwayPositions[index + 1]),
+      ].filter((direction): direction is SubwayDirection => !!direction);
+
+      return [
+        `${pos.x},${pos.y}`,
+        { connections, index, isHead: index === 0 },
+      ];
+    })
+  );
+
   return (
     <div className="board-container">
       <div className="board-grid">
@@ -56,6 +85,7 @@ export default function Board({
             const isCenterBlocked = game.centerRulesActive && x === 4 && y === 4;
             const hasBus1 = game.buses.BUS1?.pos.x === x && game.buses.BUS1?.pos.y === y;
             const hasBus2 = game.buses.BUS2?.pos.x === x && game.buses.BUS2?.pos.y === y;
+            const subwayTile = subwayTiles.get(`${x},${y}`);
 
             return (
               <div
@@ -74,6 +104,32 @@ export default function Board({
                 ) : null}
                 {isCenterBlocked ? (
                   <span className="tile-center-blocked-label">벽</span>
+                ) : null}
+                {subwayTile ? (
+                  <>
+                    <span className="tile-subway-rails">
+                      {subwayTile.connections.map((direction) => (
+                        <span
+                          className={`tile-subway-rail tile-subway-rail-${direction}`}
+                          key={direction}
+                        />
+                      ))}
+                    </span>
+                    <span
+                      className={`tile-subway-marker ${
+                        subwayTile.isHead ? "tile-subway-marker-head" : ""
+                      }`}
+                    >
+                      {subwayTile.isHead ? (
+                        <>
+                          <span className="tile-subway-window" />
+                          <span className="tile-subway-label">M</span>
+                        </>
+                      ) : (
+                        <span className="tile-subway-window" />
+                      )}
+                    </span>
+                  </>
                 ) : null}
               </div>
             );
@@ -192,45 +248,15 @@ export default function Board({
         );
       })}
 
-      {game.subways && Object.entries(game.subways)
-        .filter(([, subway]) => subway.active && subway.pos.length > 0)
-        .map(([busType, subway]) => {
-          const isFaded = showFacingFor && showFacingFor !== busType;
-          return subway.pos.map((pos, index) => {
-            const step = tileSize + tileGap;
-            const left = 12 + pos.x * step + tileSize / 2 - 12;
-            const top = 12 + pos.y * step + tileSize / 2 - 12;
-            const isBus1 = busType === BusType.BUS1;
-            return (
-              <div
-                key={`subway-${busType}-${index}`}
-                className={`subway-marker subway-marker-${busType}`}
-                style={{
-                  width: 24,
-                  height: 24,
-                  background: index === 0 
-                    ? (isBus1 ? "#111" : "#222") 
-                    : (isBus1 ? "var(--bus1-color)" : "var(--bus2-color)"),
-                  borderRadius: index === 0 ? "6px" : "12px",
-                  left,
-                  top,
-                  zIndex: isFaded ? 5 : 10,
-                  opacity: isFaded ? 0.3 : 1,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  border: isFaded ? "none" : "2px solid rgba(255,255,255,0.7)",
-                }}
-              >
-                {index === 0 ? "🚇" : ""}
-              </div>
-            );
-          });
-        })}
     </div>
   );
+}
+
+function getSubwayDirection(from: Coord, to?: Coord): SubwayDirection | null {
+  if (!to) return null;
+  if (to.x === from.x && to.y === from.y - 1) return "n";
+  if (to.x === from.x + 1 && to.y === from.y) return "e";
+  if (to.x === from.x && to.y === from.y + 1) return "s";
+  if (to.x === from.x - 1 && to.y === from.y) return "w";
+  return null;
 }
