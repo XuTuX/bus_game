@@ -10,7 +10,7 @@ import { type ReactNode } from "react";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
-  Orange: "var(--team-orange)",
+  Purple: "var(--team-purple)",
   Yellow: "var(--team-yellow)",
   Green: "var(--team-green)",
   Blue: "var(--team-blue)",
@@ -18,7 +18,7 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
 
 const DEFAULT_TEAM_LABELS: Record<Colour, string> = {
   Red: "Red",
-  Orange: "Orange",
+  Purple: "Purple",
   Yellow: "Yellow",
   Green: "Green",
   Blue: "Blue",

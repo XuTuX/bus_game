@@ -19,7 +19,7 @@ const STATUS_LABELS = {
 
 const TEAM_LABELS: Record<Colour, string> = {
   Red: "레드",
-  Orange: "오렌지",
+  Purple: "퍼플",
   Yellow: "옐로",
   Green: "그린",
   Blue: "블루",
@@ -77,9 +77,9 @@ export default function PublicBoardPage({
                   padding: "8px 10px",
                   background: "rgba(253, 121, 168, 0.12)",
                   borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--team-orange)",
+                  border: "1px solid var(--team-purple)",
                   fontSize: "0.78rem",
-                  color: "var(--team-orange)",
+                  color: "var(--team-purple)",
                   fontWeight: 600,
                   textAlign: "left",
                   lineHeight: 1.4,

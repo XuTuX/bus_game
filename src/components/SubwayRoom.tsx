@@ -29,7 +29,7 @@ const CARD_NAMES: Record<CardKind, string> = {
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
-  Orange: "var(--team-orange)",
+  Purple: "var(--team-purple)",
   Yellow: "var(--team-yellow)",
   Green: "var(--team-green)",
   Blue: "var(--team-blue)",
@@ -37,7 +37,7 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
 
 const TEAM_BG_VARS: Record<Colour, string> = {
   Red: "var(--team-red-bg)",
-  Orange: "var(--team-orange-bg)",
+  Purple: "var(--team-purple-bg)",
   Yellow: "var(--team-yellow-bg)",
   Green: "var(--team-green-bg)",
   Blue: "var(--team-blue-bg)",

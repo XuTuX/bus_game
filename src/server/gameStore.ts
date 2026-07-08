@@ -357,7 +357,7 @@ function addLobbyParticipant(room: RoomState, name: string): LobbyParticipant {
 
 const COLOUR_KOREAN: Record<Colour, string> = {
   [Colour.Red]: "레드",
-  [Colour.Orange]: "오렌지",
+  [Colour.Purple]: "퍼플",
   [Colour.Yellow]: "옐로",
   [Colour.Green]: "그린",
   [Colour.Blue]: "블루",

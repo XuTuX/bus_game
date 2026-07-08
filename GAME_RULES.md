@@ -8,7 +8,7 @@
 
 - PLUS 버스는 점수를 더합니다.
 - MINUS 버스는 점수를 뺍니다.
-- 각 칸은 `Red`, `Orange`, `Yellow`, `Green`, `Blue` 중 하나의 색을 가집니다.
+- 각 칸은 `Red`, `Purple`, `Yellow`, `Green`, `Blue` 중 하나의 색을 가집니다.
 - 어떤 색 칸을 지나가거나 어떤 색 영역에 버스가 멈추는지에 따라 해당 색 팀의 점수가 변합니다.
 - 게임 종료 시 점수가 가장 높은 팀이 승리합니다.
 - 동점이면 공동 1등으로 볼 수 있습니다.
@@ -30,7 +30,7 @@
 
 - 팀 색상은 5개입니다.
   - Red
-  - Orange
+  - Purple
   - Yellow
   - Green
   - Blue
@@ -60,9 +60,9 @@
 | 차례 | PLUS 담당 색상 | MINUS 담당 색상 |
 | --- | --- | --- |
 | 1 | Red | Blue |
-| 2 | Orange | Green |
+| 2 | Purple | Green |
 | 3 | Yellow | Yellow |
-| 4 | Green | Orange |
+| 4 | Green | Purple |
 | 5 | Blue | Red |
 
 한 차례는 다음 순서로 진행됩니다.
@@ -203,9 +203,9 @@ MINUS 버스:
 - PLUS 버스가 Red 칸, Blue 칸, Blue 칸을 지나가면:
   - Red `+1`
   - Blue `+2`
-- MINUS 버스가 Green 칸, Orange 칸을 지나가면:
+- MINUS 버스가 Green 칸, Purple 칸을 지나가면:
   - Green `-1`
-  - Orange `-1`
+  - Purple `-1`
 
 회전 카드는 칸을 지나가지 않으므로 이동 점수가 없습니다.
 

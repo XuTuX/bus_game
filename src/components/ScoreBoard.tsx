@@ -2,7 +2,7 @@ import { BusType, COLOURS, type Colour, type GameState } from "@/lib/game";
 
 const COLOUR_LABELS: Record<Colour, string> = {
   Red: "레드",
-  Orange: "오렌지",
+  Purple: "퍼플",
   Yellow: "옐로",
   Green: "그린",
   Blue: "블루",

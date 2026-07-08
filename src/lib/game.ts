@@ -1,6 +1,6 @@
 export enum Colour {
   Red = "Red",
-  Orange = "Orange",
+  Purple = "Purple",
   Yellow = "Yellow",
   Green = "Green",
   Blue = "Blue",
@@ -119,7 +119,7 @@ export interface StepResult {
 export const BOARD_SIZE = 9;
 export const COLOURS = [
   Colour.Red,
-  Colour.Orange,
+  Colour.Purple,
   Colour.Yellow,
   Colour.Green,
   Colour.Blue,
@@ -714,8 +714,8 @@ export function colourSymbol(colour: Colour | null): string {
   switch (colour) {
     case Colour.Red:
       return "R";
-    case Colour.Orange:
-      return "O";
+    case Colour.Purple:
+      return "P";
     case Colour.Yellow:
       return "Y";
     case Colour.Green:
@@ -743,7 +743,7 @@ export function cardLabel(card: Card): string {
 export function emptyScores(): Record<Colour, number> {
   return {
     [Colour.Red]: 0,
-    [Colour.Orange]: 0,
+    [Colour.Purple]: 0,
     [Colour.Yellow]: 0,
     [Colour.Green]: 0,
     [Colour.Blue]: 0,

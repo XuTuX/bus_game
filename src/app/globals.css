@@ -20,8 +20,8 @@
   --team-red: #ff7675;
   --team-red-bg: rgba(255, 118, 117, 0.15);
   
-  --team-orange: #a78bfa;
-  --team-orange-bg: rgba(167, 139, 250, 0.18);
+  --team-purple: #a78bfa;
+  --team-purple-bg: rgba(167, 139, 250, 0.18);
 
   --team-yellow: #fdcb6e;
   --team-yellow-bg: rgba(253, 203, 110, 0.15);
@@ -201,7 +201,7 @@ h1, h2, h3, .brand-font {
 }
 
 .tile-Red { background: var(--team-red); }
-.tile-Orange { background: var(--team-orange); }
+.tile-Purple { background: var(--team-purple); }
 .tile-Yellow { background: var(--team-yellow); }
 .tile-Green { background: var(--team-green); }
 .tile-Blue { background: var(--team-blue); }
@@ -602,7 +602,7 @@ h1, h2, h3, .brand-font {
   flex-shrink: 0;
 }
 .score-dot-Red { background: var(--team-red); }
-.score-dot-Orange { background: var(--team-orange); }
+.score-dot-Purple { background: var(--team-purple); }
 .score-dot-Yellow { background: var(--team-yellow); }
 .score-dot-Green { background: var(--team-green); }
 .score-dot-Blue { background: var(--team-blue); }
@@ -1048,7 +1048,7 @@ h1, h2, h3, .brand-font {
 }
 
 .next-action {
-  background: var(--team-orange);
+  background: var(--team-purple);
 }
 
 .master-waiting {

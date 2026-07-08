@@ -21,7 +21,7 @@ import { type LogEntry } from "@/server/gameStore";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
-  Orange: "var(--team-orange)",
+  Purple: "var(--team-purple)",
   Yellow: "var(--team-yellow)",
   Green: "var(--team-green)",
   Blue: "var(--team-blue)",
@@ -29,7 +29,7 @@ const TEAM_COLOUR_VARS: Record<Colour, string> = {
 
 const TEAM_LABELS: Record<Colour, string> = {
   Red: "레드",
-  Orange: "오렌지",
+  Purple: "퍼플",
   Yellow: "옐로",
   Green: "그린",
   Blue: "블루",
