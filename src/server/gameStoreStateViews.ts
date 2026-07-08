@@ -102,13 +102,6 @@ function getActivePlayerNames(room: RoomState): string | null {
     if (bus2Player && !room.pendingMoves.BUS2 && bus2Player.id !== bus1Player?.id) {
       names.push(`${bus2Player.name}(BUS2)`);
     }
-    for (const team of getSubwayMoveTeams(room.game)) {
-      const teamPlayers = room.game.players.filter((p) => p.team === team);
-      const pendingCount = teamPlayers.filter((p) => !room.pendingSubwayMoves?.[p.id]).length;
-      if (pendingCount > 0) {
-        names.push(`${team}팀(${pendingCount}명 대기)`);
-      }
-    }
   } else if (room.status === "ACTION_PHASE") {
     if (bus1Player && room.pendingActions.BUS1 === undefined) {
       names.push(`${bus1Player.name}(BUS1)`);
@@ -119,13 +112,6 @@ function getActivePlayerNames(room: RoomState): string | null {
       bus2Player.id !== bus1Player?.id
     ) {
       names.push(`${bus2Player.name}(BUS2)`);
-    }
-    for (const team of getSubwayMoveTeams(room.game)) {
-      const teamPlayers = room.game.players.filter((p) => p.team === team);
-      const pendingCount = teamPlayers.filter((p) => !room.pendingSubwayMoves?.[p.id]).length;
-      if (pendingCount > 0) {
-        names.push(`${team}팀(${pendingCount}명 대기)`);
-      }
     }
   }
 

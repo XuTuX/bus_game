@@ -99,6 +99,10 @@ export function submitTurnToRoom(
 function submitMovePhase(room: RoomState, actions: MoveTurnAction[], bus: BusType) {
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
 
+  if (actions.length === 0) {
+    throw new Error("버스 이동은 패스할 수 없습니다. 카드 1장 이상을 제출하세요.");
+  }
+
   if (bus === BusType.BUS1) {
     room.pendingMoves.BUS1 = actions;
   } else {
@@ -123,7 +127,7 @@ function submitSubwayMovePhase(
   }
 
   if (actions.length > 1) {
-    throw new Error("지하철 조작 카드는 개인당 최대 1장만 낼 수 있습니다.");
+    throw new Error("지하철 조작 카드는 플레이어당 최대 1장만 낼 수 있습니다.");
   }
 
   const action = actions[0];
@@ -205,9 +209,10 @@ function resolveMovePhaseIfReady(room: RoomState) {
   }
 
   const beforeDestinationBonus = { ...clone.teamScores };
+  const { busTeam } = getTurnControllers(clone);
   scoreMatchingBusDestinationBonus(
     clone,
-    [bus1Player?.team, bus2Player?.team].filter(Boolean) as typeof clone.players[number]["team"][]
+    [busTeam]
   );
   appendScoreDeltaLogActions(
     actionDetails,
@@ -215,6 +220,18 @@ function resolveMovePhaseIfReady(room: RoomState) {
     clone.teamScores,
     "두 버스 같은 색 도착 보너스"
   );
+
+  const beforeDistanceScores = { ...clone.teamScores };
+  const distancePenalty = scoreBusDistancePenalty(clone, busTeam);
+  appendScoreDeltaLogActions(
+    actionDetails,
+    beforeDistanceScores,
+    clone.teamScores,
+    distancePenalty
+      ? `버스 간 거리 ${distancePenalty.distance}칸 감점`
+      : "버스 간 거리 감점"
+  );
+
   addTurnLog(room, actionDetails, room.game.roundIndex + 1, room.game.turnIndex + 1, "MOVE");
 
   room.game = clone;
@@ -230,10 +247,14 @@ function submitActionPhase(
 ) {
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
 
+  if (!action) {
+    throw new Error("버스 행동은 패스할 수 없습니다. 교환할 타일을 선택해 제출하세요.");
+  }
+
   if (bus === BusType.BUS1) {
-    room.pendingActions.BUS1 = action || null;
+    room.pendingActions.BUS1 = action;
   } else {
-    room.pendingActions.BUS2 = action || null;
+    room.pendingActions.BUS2 = action;
   }
 
   if (!bus1Player) room.pendingActions.BUS1 = null;
@@ -258,22 +279,6 @@ export function finalizeTurnResult(room: RoomState) {
     room.pendingActions.BUS2 === undefined
   ) {
     throw new Error("아직 두 버스의 행동 제출이 끝나지 않았습니다.");
-  }
-
-  const subwayTeams = getSubwayMoveTeams(room.game);
-  const subwayPlayers = room.game.players.filter((p) => subwayTeams.includes(p.team));
-  for (const p of subwayPlayers) {
-    if (!room.pendingSubwayMoves[p.id]) {
-      room.pendingSubwayMoves[p.id] = {
-        playerId: p.id,
-        playerName: p.name,
-        team: p.team,
-        subway: BusType.BUS1,
-        action: null,
-        cardKind: undefined,
-        submittedOrder: 999,
-      };
-    }
   }
 
   const clone = deepClone(room.game);
@@ -308,32 +313,21 @@ export function finalizeTurnResult(room: RoomState) {
     "버스 도착 칸 영역 점수"
   );
 
+  let subwayActionApplied = false;
   getOrderedSubwaySubmissions(room).forEach((submission) => {
-    appendSubwayLogAction(actionDetails, clone, submission);
+    subwayActionApplied = appendSubwayLogAction(actionDetails, clone, submission) || subwayActionApplied;
   });
 
-  const beforeSubwayScores = { ...clone.teamScores };
-  scoreSubwayTiles(clone);
-  appendScoreDeltaLogActions(
-    actionDetails,
-    beforeSubwayScores,
-    clone.teamScores,
-    "지하철 통과 색상 점수"
-  );
-
-  const beforeDistanceScores = { ...clone.teamScores };
-  const finalDist = Math.abs(clone.buses.BUS1.pos.x - clone.buses.BUS2.pos.x) + Math.abs(clone.buses.BUS1.pos.y - clone.buses.BUS2.pos.y);
-  if (finalDist === 1 || finalDist === 2) {
-    const penalty = finalDist === 1 ? 5 : 2;
-    if (bus1Player) clone.teamScores[bus1Player.team] -= penalty;
-    if (bus2Player) clone.teamScores[bus2Player.team] -= penalty;
+  if (subwayActionApplied) {
+    const beforeSubwayScores = { ...clone.teamScores };
+    scoreSubwayTiles(clone);
+    appendScoreDeltaLogActions(
+      actionDetails,
+      beforeSubwayScores,
+      clone.teamScores,
+      "지하철 점수"
+    );
   }
-  appendScoreDeltaLogActions(
-    actionDetails,
-    beforeDistanceScores,
-    clone.teamScores,
-    `버스 간 거리 ${finalDist}칸 감점`
-  );
 
   addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1, "ACTION");
 
@@ -367,22 +361,14 @@ function appendMoveLogActions(
     });
   });
 
-  if (moves.length === 0) {
-    actionDetails.push({
-      actionLabel: "이동 패스",
-      bus,
-      applied: true,
-      scoreGained: 0,
-    });
-  }
 }
 
 function appendSubwayLogAction(
   actionDetails: LogEntry["actions"],
   game: GameState,
   submission: SubwayMoveSubmission
-) {
-  const player = findClonePlayer(game, submission.playerId);
+): boolean {
+  const player = game.players.find((p) => p.id === submission.playerId);
   const subwayLabel = "지하철";
 
   if (!submission.action) {
@@ -392,7 +378,18 @@ function appendSubwayLogAction(
       applied: true,
       scoreGained: 0,
     });
-    return;
+    return false;
+  }
+
+  if (!player) {
+    actionDetails.push({
+      actionLabel: `${subwayLabel} 이동`,
+      bus: BusType.BUS1,
+      applied: false,
+      reason: "제출 플레이어를 찾을 수 없습니다.",
+      scoreGained: 0,
+    });
+    return false;
   }
 
   const cardIndex =
@@ -408,7 +405,7 @@ function appendSubwayLogAction(
       reason: "제출한 이동 카드가 손패에 남아있지 않습니다.",
       scoreGained: 0,
     });
-    return;
+    return false;
   }
 
   const moveAction: MoveTurnAction = {
@@ -428,6 +425,7 @@ function appendSubwayLogAction(
     reason: result.reason,
     scoreGained: result.scoreGained ?? 0,
   });
+  return result.applied;
 }
 
 function appendScoreDeltaLogActions(
@@ -482,14 +480,18 @@ function appendActionLogAction(
   action: ActionPhaseTurnAction | null,
   bus: BusType
 ) {
+  if (!action) {
+    throw new Error("버스 행동 제출이 필요합니다.");
+  }
+
   const player = findClonePlayer(game, playerId);
   const result = runActionPhase(player, action, game);
 
   actionDetails.push({
-    actionLabel: action ? actionPhaseLabel(action) : "행동 패스",
+    actionLabel: actionPhaseLabel(action),
     bus,
-    applied: action ? result.applied : true,
-    reason: action ? result.reason : undefined,
+    applied: result.applied,
+    reason: result.reason,
     scoreGained: 0,
   });
 }
@@ -533,6 +535,22 @@ function scoreCurrentBusRegions(game: GameState) {
     game.teamScores[bus2Color] += bus2Size;
   }
 }
+
+function scoreBusDistancePenalty(game: GameState, team: GameState["players"][number]["team"]) {
+  const bus1 = game.buses.BUS1.pos;
+  const bus2 = game.buses.BUS2.pos;
+  const distance = Math.max(Math.abs(bus1.x - bus2.x), Math.abs(bus1.y - bus2.y));
+  const penalty = distance <= 1 ? 5 : distance <= 2 ? 2 : 0;
+
+  if (penalty > 0) {
+    game.teamScores[team] -= penalty;
+    game.logs.push(`두 버스 거리가 ${distance}칸 이내입니다. ${team}팀 -${penalty}점`);
+    return { distance, penalty };
+  }
+
+  return null;
+}
+
 
 function actionLabel(action: TurnAction, currentHand: Card[]): string {
   if (action.type === "SWAP_TILE") {

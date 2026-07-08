@@ -357,36 +357,6 @@ export default function DealerRoom({
     }
   };
 
-  // Handle Skipping Action
-  const handleActionPass = async () => {
-    if (!resolvedPlayerId || status !== "ACTION_PHASE" || !canAct) return;
-    setSubmitting(true);
-    setErrorMsg("");
-    try {
-      await submitAction(roomCode, resolvedPlayerId, [], activeBusType);
-      setSelectedActionType(null);
-      setActionTarget(null);
-    } catch (e: any) {
-      setErrorMsg(e.message || "행동 패스에 실패했습니다.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handlePass = async () => {
-    if (!resolvedPlayerId || status !== "CHOOSING" || !canAct) return;
-    setSubmitting(true);
-    setErrorMsg("");
-    try {
-      await submitAction(roomCode, resolvedPlayerId, [], activeBusType);
-      setSelectedMoves([]);
-    } catch (e: any) {
-      setErrorMsg(e.message || "이동 패스에 실패했습니다.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // Role subtitle text
   const getRoleSubtitle = () => {
     if (roomBus) return `(${roomBusLabel} 전용 방)`;
@@ -462,7 +432,7 @@ export default function DealerRoom({
             ) : status === "CHOOSING" && hasISubmittedMoves ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font" style={{ color: "var(--bus1-color)" }}>이동 제출 완료!</h3>
-                <p style={{ marginTop: 8 }}>상대방 플레이어의 이동 카드 제출을 기다리고 있습니다...</p>
+                <p style={{ marginTop: 8 }}>다른 버스의 이동 카드 제출을 기다리고 있습니다...</p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                   <span>1번 버스 제출 상태: {isBus1Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                   <span>2번 버스 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
@@ -474,7 +444,7 @@ export default function DealerRoom({
                 <p style={{ marginTop: 8 }}>
                   {isBus1ActionSubmitted && isBus2ActionSubmitted
                     ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
-                    : "상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다..."}
+                    : "다른 버스의 타일 교환 제출을 기다리고 있습니다..."}
                 </p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                   <span>1번 버스 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
@@ -712,14 +682,6 @@ export default function DealerRoom({
                         style={{ flex: 2 }}
                       >
                         {submitting ? "제출 중..." : "행동 제출 & 차례 마치기"}
-                      </button>
-                      <button
-                        className="btn btn-ghost"
-                        onClick={handleActionPass}
-                        disabled={submitting}
-                        style={{ flex: 1 }}
-                      >
-                        행동 패스
                       </button>
                     </div>
                   </div>

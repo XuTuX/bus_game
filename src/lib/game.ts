@@ -223,10 +223,10 @@ export function step(
       break;
     }
 
-    // 2. Check center gray cell collision
-    if (game.centerRulesActive && next.x === 4 && next.y === 4) {
+    // 2. Check center gray cell collision. Buses start on the center, but may not enter it again.
+    if (next.x === 4 && next.y === 4) {
       collisionOccurred = true;
-      logs.push(`중앙 회색 구역은 이제 막힌 구역입니다. ${busType} 충돌!`);
+      logs.push(`중앙 회색 벽에 ${busType}이(가) 충돌했습니다.`);
       break;
     }
 
@@ -245,15 +245,6 @@ export function step(
     if (hitWall) {
       collisionOccurred = true;
       logs.push(`${busType}이(가) 벽에 충돌했습니다.`);
-      break;
-    }
-
-    // 5. Check block obstacle collision
-    const hitObstacleIdx = game.obstacles.findIndex(o => coordsEqual(o, next));
-    if (hitObstacleIdx !== -1) {
-      collisionOccurred = true;
-      logs.push(`${busType}이(가) 장애물에 충돌했습니다.`);
-      game.obstacles.splice(hitObstacleIdx, 1);
       break;
     }
 
@@ -280,6 +271,10 @@ export function stepSubway(subway: SubwayState, card: Card): StepResult {
     const next = stepCoord(subway.pos[0], subway.facing);
     if (next.x < 0 || next.x >= BOARD_SIZE || next.y < 0 || next.y >= BOARD_SIZE) {
       logs.push(`지하철이 보드 밖으로 나갈 수 없어 멈췄습니다.`);
+      break;
+    }
+    if (next.x === 4 && next.y === 4) {
+      logs.push(`지하철이 중앙 회색 벽에 부딪혀 멈췄습니다.`);
       break;
     }
     // Move body (Snake)
@@ -392,11 +387,11 @@ export function generateBoard(rng: Rng = Math.random): Tile[][] {
 
 export function dealHand(rng: Rng = Math.random): Card[] {
   const cards: Card[] = [
-    ...repeatCard("STRAIGHT1", 4),
-    ...repeatCard("STRAIGHT2", 3),
-    ...repeatCard("STRAIGHT3", 2),
-    ...repeatCard("LEFT", 3),
-    ...repeatCard("RIGHT", 3),
+    ...repeatCard("STRAIGHT1", 8),
+    ...repeatCard("STRAIGHT2", 7),
+    ...repeatCard("STRAIGHT3", 5),
+    ...repeatCard("LEFT", 6),
+    ...repeatCard("RIGHT", 6),
   ];
   return shuffle(cards, rng);
 }
@@ -446,24 +441,9 @@ export function runMovePhase(
       const bus = game.buses[busType];
       result = step(bus, card, game, busType);
       
-      // Update Center Rules
-      if (!game.centerRulesActive) {
-        const b1 = game.buses[BusType.BUS1].pos;
-        const b2 = game.buses[BusType.BUS2].pos;
-        if ((b1.x !== 4 || b1.y !== 4) && (b2.x !== 4 || b2.y !== 4)) {
-          game.centerRulesActive = true;
-          if (result.logs) result.logs.push("두 버스가 모두 중앙을 벗어나, 이제 중앙 구역은 막혔습니다.");
-        }
-      }
-
-      // Handle collision penalty
-      if (result.collisionPenalty) {
-        // game.teamScores[player.team] -= 2; // Removed according to new rules
-      }
-
       // Handle path scoring and arrivals
+      let gained = 0;
       if (result.applied && result.path && result.path.length > 0) {
-        let gained = 0;
         for (const coord of result.path) {
           const tile = game.board[coord.y]?.[coord.x];
           if (!tile || !tile.colour) continue;
@@ -473,8 +453,12 @@ export function runMovePhase(
           gained += score;
 
         }
-        result.scoreGained = gained;
       }
+      if (result.collisionPenalty) {
+        game.teamScores[player.team] -= 3;
+        gained -= 3;
+      }
+      result.scoreGained = gained;
       // Distance Penalty moved to end of turn
     }
     
@@ -495,20 +479,19 @@ export function runMovePhase(
 }
 
 export function scoreSubwayTiles(game: GameState): void {
-  const scoredColors = new Set<Colour>();
   for (const subway of Object.values(game.subways)) {
     if (!subway.active) continue;
-    const pos = subway.pos[0];
-    if (pos) {
+    const counts = new Map<Colour, number>();
+    for (const pos of subway.pos) {
       const tile = game.board[pos.y]?.[pos.x];
       if (tile && tile.colour) {
-        scoredColors.add(tile.colour);
+        counts.set(tile.colour, (counts.get(tile.colour) ?? 0) + 1);
       }
     }
-  }
-  for (const colour of scoredColors) {
-    game.teamScores[colour] += 1;
-    game.logs.push(`지하철이 ${colour} 칸에 정차했습니다. +1점`);
+    for (const [colour, count] of counts) {
+      game.teamScores[colour] += count;
+      game.logs.push(`지하철이 차지한 ${colour} 칸 ${count}개: +${count}점`);
+    }
   }
 }
 

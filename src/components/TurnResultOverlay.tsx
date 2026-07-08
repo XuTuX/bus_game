@@ -31,7 +31,12 @@ export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
 
   // 1번 버스 이동
   moveActions
-    .filter((a) => a.bus === BusType.BUS1 && !a.actionLabel.includes("보너스"))
+    .filter(
+      (a) =>
+        a.bus === BusType.BUS1 &&
+        !a.actionLabel.includes("보너스") &&
+        !a.actionLabel.includes("감점")
+    )
     .forEach((a) => {
       allAnimated.push({
         id: idCounter++,
@@ -46,7 +51,7 @@ export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
 
   // 2번 버스 이동
   moveActions
-    .filter((a) => a.bus === BusType.BUS2)
+    .filter((a) => a.bus === BusType.BUS2 && !a.actionLabel.includes("감점"))
     .forEach((a) => {
       allAnimated.push({
         id: idCounter++,
@@ -61,7 +66,7 @@ export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
 
   // 보너스 점수
   moveActions
-    .filter((a) => a.actionLabel.includes("보너스"))
+    .filter((a) => a.actionLabel.includes("보너스") || a.actionLabel.includes("감점"))
     .forEach((a) => {
       allAnimated.push({
         id: idCounter++,

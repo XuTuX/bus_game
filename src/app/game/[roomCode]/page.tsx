@@ -180,10 +180,17 @@ function PublicTurnResult({ logs }: { logs: LogEntry[] }) {
     .filter((log) => log.phase === "ACTION")
     .flatMap((log) => log.actions);
   const bus1MoveActions = moveActions.filter(
-    (action) => action.bus === BusType.BUS1 && !action.actionLabel.includes("보너스")
+    (action) =>
+      action.bus === BusType.BUS1 &&
+      !action.actionLabel.includes("보너스") &&
+      !action.actionLabel.includes("감점")
   );
-  const bus2MoveActions = moveActions.filter((action) => action.bus === BusType.BUS2);
-  const bonusActions = moveActions.filter((action) => action.actionLabel.includes("보너스"));
+  const bus2MoveActions = moveActions.filter(
+    (action) => action.bus === BusType.BUS2 && !action.actionLabel.includes("감점")
+  );
+  const bonusActions = moveActions.filter(
+    (action) => action.actionLabel.includes("보너스") || action.actionLabel.includes("감점")
+  );
   const bus1ActionActions = actionPhaseActions.filter(
     (action) =>
       action.bus === BusType.BUS1 &&

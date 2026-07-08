@@ -32,29 +32,48 @@ export function getTurnControllers(game: GameState): TurnControllers {
 export function getSubwayMoveTeams(game: GameState): Colour[] {
   const { busTeam } = getTurnControllers(game);
   const teamsInGame = new Set(game.players.map((player) => player.team));
+  const nextTeam = getNextTurnTeam(game);
+
   return getSubwayTeamOrder(game).filter(
-    (team) => team !== busTeam && teamsInGame.has(team)
+    (team) =>
+      team !== busTeam &&
+      (!nextTeam || team !== nextTeam) &&
+      teamsInGame.has(team)
   );
 }
 
 export function getSubwayTeamOrder(game: GameState): Colour[] {
   const roundColourOrder = getRoundColourOrder(game.roundIndex);
-  const startIndex = (game.turnIndex + 1) % COLOURS.length;
+  const startIndex = (game.turnIndex + 2) % COLOURS.length;
   return [
     ...roundColourOrder.slice(startIndex),
     ...roundColourOrder.slice(0, startIndex),
   ];
 }
 
+function getNextTurnTeam(game: GameState): Colour | undefined {
+  const nextTurnIndex = game.turnIndex + 1;
+  if (nextTurnIndex < COLOURS.length) {
+    return getRoundColourOrder(game.roundIndex)[nextTurnIndex];
+  }
+
+  const nextRoundIndex = game.roundIndex + 1;
+  if (nextRoundIndex >= 8) {
+    return undefined;
+  }
+
+  return getRoundColourOrder(nextRoundIndex)[0];
+}
+
 export function getSubwayTeamPlayerOptions(
   game: GameState
 ): Partial<Record<Colour, SubwayTeamPlayerOption[]>> {
-  const { busTeam } = getTurnControllers(game);
+  const eligibleTeams = new Set(getSubwayMoveTeams(game));
   const result: Partial<Record<Colour, SubwayTeamPlayerOption[]>> = {};
 
   for (const room of [BusType.BUS1, BusType.BUS2] as const) {
     for (const entry of getRoomOrderedPlayers(game, room)) {
-      if (entry.player.team === busTeam) {
+      if (!eligibleTeams.has(entry.player.team)) {
         continue;
       }
       const teamOptions = result[entry.player.team] ?? [];

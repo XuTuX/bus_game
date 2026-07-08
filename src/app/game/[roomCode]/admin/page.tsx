@@ -588,7 +588,7 @@ function SubwaySubmissionStatus({ state }: { state: PublicStateResult }) {
       <div className="subway-status-heading">
         <span className="tiny-label">지하철 제출</span>
         <strong>
-          {state.subwayPreview?.submissions.length ?? 0}명 제출
+          선택 제출 · {state.subwayPreview?.submissions.length ?? 0}명 제출
         </strong>
       </div>
       <div className="subway-team-status-list">
@@ -621,7 +621,7 @@ function SubwaySubmissionStatus({ state }: { state: PublicStateResult }) {
                       key={player.playerId}
                     >
                       <strong>{player.playerName || player.playerId}</strong>
-                      <span>{submission?.label ?? "대기"}</span>
+                      <span>{submission?.label ?? "미제출 가능"}</span>
                     </span>
                   );
                 })}

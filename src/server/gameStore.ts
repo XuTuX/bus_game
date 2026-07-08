@@ -263,12 +263,18 @@ export async function adminStartGame(roomCode: string): Promise<void> {
     if (room.status !== "LOBBY") {
       throw new Error("이미 게임이 시작되었습니다.");
     }
-    if (room.participants.length === 0) {
-      throw new Error("참가자가 1명 이상 필요합니다.");
+    if (room.participants.length !== MAX_PLAYERS) {
+      throw new Error("게임 시작에는 참가자 10명이 필요합니다.");
     }
     const missingColour = room.participants.find((participant) => !participant.colour);
     if (missingColour) {
       throw new Error("참가자 색상 자동 배정에 실패했습니다.");
+    }
+    for (const colour of COLOURS) {
+      const colourCount = room.participants.filter((participant) => participant.colour === colour).length;
+      if (colourCount !== MAX_PLAYERS_PER_COLOUR) {
+        throw new Error("각 색상에는 참가자 2명이 필요합니다.");
+      }
     }
     const missingName = room.participants.find((p) => !p.name.trim());
     if (missingName) {

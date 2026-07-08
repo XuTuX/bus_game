@@ -255,7 +255,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
           <section className="dealer-panel dealer-hand-pane">
             <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
               <h2 className="brand-font">지하철 입력</h2>
-              <span>개인당 카드 최대 1장</span>
+              <span>선택 제출 · 플레이어당 카드 최대 1장</span>
             </div>
 
             {errorMsg && <div className="error-box">{errorMsg}</div>}
@@ -272,7 +272,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                   subwayTeams.map((team) => {
                     const teamPlayers = subwayTeamPlayers[team] ?? [];
                     const submittedCount = teamPlayers.filter((p) => pendingSubwayMoves[p.playerId]).length;
-                    const statusText = submittedCount === teamPlayers.length ? "완료" : `${submittedCount}/${teamPlayers.length} 제출`;
+                    const statusText = `${submittedCount}/${teamPlayers.length} 제출`;
                     const isAllSubmitted = submittedCount === teamPlayers.length;
 
                     return (
@@ -313,7 +313,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                       >
                         <strong>{player.playerName ?? player.playerId}</strong>
                         <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
-                          {player.roomIndex}번 제출자 {submitted ? "(제출 완료)" : ""}
+                          {submitted ? "제출 완료" : `${player.roomIndex}번 제출자`}
                         </span>
                       </button>
                     );
@@ -330,7 +330,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                   publicState.pendingActions?.BUS1 &&
                   publicState.pendingActions?.BUS2
                     ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
-                    : "이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다."}
+                    : "이동 단계가 시작되면 행동 단계가 끝나기 전까지 원하는 팀만 지하철 카드를 제출할 수 있습니다."}
                 </p>
               </div>
             ) : isSelectedPlayerSubmitted ? (
@@ -407,7 +407,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                     disabled={!canSubmit}
                     style={{ flex: 1 }}
                   >
-                    패스
+                    이번 플레이어는 안 함
                   </button>
                 </div>
               </>
