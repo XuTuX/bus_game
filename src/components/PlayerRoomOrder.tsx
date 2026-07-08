@@ -37,6 +37,7 @@ type PlayerRoomOrderProps = {
   status: RoomStatus;
   teamLabels?: Record<Colour, string>;
   onNameSave?: (playerId: string, name: string) => void;
+  onPlayerClick?: (playerId: string) => void;
 };
 
 type OrderSource = {
@@ -75,6 +76,7 @@ function LobbyPlayerNameInput({
       maxLength={16}
       placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
       onBlur={() => {
         if (value.trim() !== participant.name) {
           onSave(participant.id, value.trim());
@@ -105,6 +107,7 @@ export default function PlayerRoomOrder({
   status,
   teamLabels = DEFAULT_TEAM_LABELS,
   onNameSave,
+  onPlayerClick,
 }: PlayerRoomOrderProps) {
   if (participants.length === 0) {
     return <div className="empty-state">{emptyText}</div>;
@@ -127,6 +130,7 @@ export default function PlayerRoomOrder({
         teamLabels={teamLabels}
         status={status}
         onNameSave={onNameSave}
+        onPlayerClick={onPlayerClick}
       />
       <RoomSection
         activePlayerNames={activePlayerNames}
@@ -138,6 +142,7 @@ export default function PlayerRoomOrder({
         teamLabels={teamLabels}
         status={status}
         onNameSave={onNameSave}
+        onPlayerClick={onPlayerClick}
       />
     </div>
   );
@@ -153,6 +158,7 @@ function RoomSection({
   teamLabels,
   status,
   onNameSave,
+  onPlayerClick,
 }: {
   activePlayerNames?: string | null;
   busType: BusType;
@@ -163,6 +169,7 @@ function RoomSection({
   teamLabels: Record<Colour, string>;
   status: RoomStatus;
   onNameSave?: (playerId: string, name: string) => void;
+  onPlayerClick?: (playerId: string) => void;
 }) {
   const roomName = busType === BusType.BUS1 ? "1번 버스 방" : "2번 버스 방";
   const roomSymbol = busType === BusType.BUS1 ? "1번" : "2번";
@@ -182,10 +189,12 @@ function RoomSection({
                 "player-row",
                 rowClassName,
                 isActiveEntry(entry, activePlayerNames) ? "player-row-active" : "",
+                onPlayerClick ? "player-row-clickable" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               key={`${busType}-${entry.id}`}
+              onClick={() => onPlayerClick?.(entry.id)}
             >
               <div className="player-identity">
                 <span className="seat-number">{entry.roomIndex}</span>

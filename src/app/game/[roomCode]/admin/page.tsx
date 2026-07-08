@@ -15,7 +15,7 @@ import {
   usePublicGame,
   type PublicStateResult,
 } from "@/lib/useGameState";
-import { COLOURS, MAX_PLAYERS, getRoundColourOrder, type CardKind, type Colour } from "@/lib/game";
+import { COLOURS, MAX_PLAYERS, getRoundColourOrder, type CardKind, type Colour, type Card } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -49,6 +49,14 @@ const CARD_LABELS: Record<CardKind, string> = {
   RIGHT: "우회전",
 };
 
+const CARD_ICONS: Record<CardKind, string> = {
+  STRAIGHT1: "➡️",
+  STRAIGHT2: "⏩",
+  STRAIGHT3: "⏭️",
+  LEFT: "↩️",
+  RIGHT: "↪️",
+};
+
 const CARD_KINDS = Object.keys(CARD_LABELS) as CardKind[];
 
 type SubmissionState = "done" | "pending";
@@ -71,6 +79,31 @@ export default function AdminPage({
   const [cardKind, setCardKind] = useState<CardKind>("STRAIGHT1");
   const [cardCount, setCardCount] = useState("1");
   const [errorMsg, setErrorMsg] = useState("");
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [selectedPlayerHand, setSelectedPlayerHand] = useState<Card[] | null>(null);
+  const [loadingHand, setLoadingHand] = useState(false);
+
+  useEffect(() => {
+    if (!selectedPlayerId) {
+      setSelectedPlayerHand(null);
+      return;
+    }
+    const fetchHand = async () => {
+      setLoadingHand(true);
+      try {
+        const res = await fetch(`/api/game/${roomCode}/player/${selectedPlayerId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSelectedPlayerHand(data.hand || []);
+        }
+      } catch (e) {
+        // ignore errors
+      } finally {
+        setLoadingHand(false);
+      }
+    };
+    fetchHand();
+  }, [selectedPlayerId, roomCode]);
 
   useEffect(() => {
     if (!state?.timerSettings || timerDirty) return;
@@ -89,6 +122,7 @@ export default function AdminPage({
   }
 
   const { status, game, participants, activePlayerNames } = state;
+  const selectedPlayer = game.players.find((p) => p.id === selectedPlayerId);
   const playerOptions = game.players.length > 0
     ? game.players
     : participants
@@ -400,6 +434,7 @@ export default function AdminPage({
             status={status}
             teamLabels={TEAM_LABELS}
             onNameSave={handleUpdatePlayerName}
+            onPlayerClick={status !== "LOBBY" ? setSelectedPlayerId : undefined}
           />
           {status !== "LOBBY" && (
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>
@@ -409,6 +444,46 @@ export default function AdminPage({
           )}
         </section>
       </main>
+
+      {selectedPlayer && (
+        <div className="hand-modal-overlay" onClick={() => setSelectedPlayerId(null)}>
+          <div className="hand-modal-content" onClick={(e) => e.stopPropagation()}>
+            <header className="hand-modal-header">
+              <h2 className="brand-font">
+                <span className={`score-dot score-dot-${selectedPlayer.team}`} />
+                {selectedPlayer.name || selectedPlayer.id}의 카드 패
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setSelectedPlayerId(null)} style={{ padding: 4, minWidth: 32, height: 32, fontSize: "1.1rem" }}>✕</button>
+            </header>
+            <div className="hand-modal-body">
+              {loadingHand ? (
+                <div style={{ textAlign: "center", padding: "20px 0" }}>
+                  <p className="empty-hand">불러오는 중...</p>
+                </div>
+              ) : selectedPlayerHand === null ? (
+                <p className="empty-hand">카드 패 정보를 불러오지 못했습니다.</p>
+              ) : selectedPlayerHand.length === 0 ? (
+                <p className="empty-hand">보유한 카드가 없습니다.</p>
+              ) : (
+                <div className="hand-cards-grid">
+                  {CARD_KINDS.map((kind) => {
+                    const count = selectedPlayerHand.filter((c) => c.kind === kind).length;
+                    if (count === 0) return null;
+
+                    return (
+                      <div key={kind} className="hand-card">
+                        <span className="hand-card-count-badge">{count}</span>
+                        <span className="hand-card-icon">{CARD_ICONS[kind]}</span>
+                        <span className="hand-card-label">{CARD_LABELS[kind]}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
