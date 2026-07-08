@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import Board from "@/components/Board";
+import BoardScorePopups from "@/components/BoardScorePopups";
 import SubwayMovePreview from "@/components/SubwayMovePreview";
 import { usePhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
 import { BusType, COLOURS, getRoundColourOrder, type Colour, type GameState } from "@/lib/game";
@@ -57,7 +58,7 @@ export default function PublicBoardPage({
   );
 
   return (
-    <div className={`public-layout ${subwayPreview?.submissions.length || (status === "RESULT_PHASE" && latestTurnLogs.length > 0) ? "" : "public-layout-no-right"}`}>
+    <div className={`public-layout ${subwayPreview?.submissions.length && status !== "RESULT_PHASE" ? "" : "public-layout-no-right"}`}>
       <aside className="public-sidebar">
         <section className="public-compact-card">
           <h2 className="brand-font">현재 라운드</h2>
@@ -153,14 +154,15 @@ export default function PublicBoardPage({
         <div className="public-board-header">
           <h2 className="brand-font">버스 보드판</h2>
         </div>
-        <Board game={game} subwayPreview={subwayPreview} />
+        <div className="board-result-wrapper">
+          <Board game={game} subwayPreview={subwayPreview} />
+          {status === "RESULT_PHASE" && latestTurnLogs.length > 0 && (
+            <BoardScorePopups logs={latestTurnLogs} game={game} />
+          )}
+        </div>
       </main>
 
-      {status === "RESULT_PHASE" && latestTurnLogs.length > 0 ? (
-        <aside className="public-sidebar public-sidebar-right">
-          <PublicTurnResult logs={latestTurnLogs} />
-        </aside>
-      ) : subwayPreview && subwayPreview.submissions.length > 0 ? (
+      {subwayPreview && subwayPreview.submissions.length > 0 && status !== "RESULT_PHASE" ? (
         <aside className="public-sidebar public-sidebar-right">
           <SubwayMovePreview submissions={subwayPreview.submissions} />
         </aside>
