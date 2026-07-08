@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   adminAddParticipant,
+  adminEndTurn,
   adminGivePlayerCards,
   adminRemoveParticipant,
   adminSetRoomTimers,
@@ -30,6 +31,7 @@ export async function POST(
         | "give_cards"
         | "start_game"
         | "start"
+        | "end_turn"
         | "start_timer";
       name?: string;
       playerId?: string;
@@ -72,6 +74,8 @@ export async function POST(
       await adminStartGame(roomCode);
     } else if (action === "start") {
       await adminStartTurn(roomCode);
+    } else if (action === "end_turn") {
+      await adminEndTurn(roomCode);
     } else if (action === "start_timer") {
       await adminStartRoomTimer(roomCode);
     } else {

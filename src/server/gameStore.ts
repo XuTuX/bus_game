@@ -8,7 +8,9 @@ import {
   BusType,
   type TurnAction,
   createGame,
+  endOfRound,
   isGameOver,
+  nextRound,
 } from "@/lib/game";
 import net from "node:net";
 import tls from "node:tls";
@@ -27,7 +29,7 @@ import {
 } from "./gameStoreTimers";
 import { deepClone } from "./gameStoreUtils";
 import { buildPrivateState, buildPublicState } from "./gameStoreStateViews";
-import { submitTurnToRoom } from "./gameStoreTurnFlow";
+import { finalizeTurnResult, submitTurnToRoom } from "./gameStoreTurnFlow";
 export type {
   LobbyParticipant,
   LogEntry,
@@ -250,6 +252,12 @@ export async function submitTurn(
   });
 }
 
+export async function adminEndTurn(roomCode: string): Promise<void> {
+  await mutateRoom(roomCode, (room) => {
+    finalizeTurnResult(room);
+  });
+}
+
 export async function adminStartGame(roomCode: string): Promise<void> {
   await mutateRoom(roomCode, (room) => {
     if (room.status !== "LOBBY") {
@@ -282,6 +290,13 @@ export async function adminStartGame(roomCode: string): Promise<void> {
 
 export async function adminStartTurn(roomCode: string): Promise<void> {
   await mutateRoom(roomCode, (room) => {
+    if (room.status === "RESULT_PHASE") {
+      room.game.turnIndex = (room.game.turnIndex + 1) % COLOURS.length;
+      if (endOfRound(room.game)) {
+        nextRound(room.game);
+      }
+    }
+
     if (isGameOver(room.game)) {
       room.status = "GAME_OVER";
       clearPhaseTimer(room);
@@ -293,7 +308,7 @@ export async function adminStartTurn(roomCode: string): Promise<void> {
     if (room.status === "LOBBY") {
       throw new Error("게임 시작 후 딜러룸 입력을 시작할 수 있습니다.");
     }
-    if (room.status !== "WAITING") {
+    if (room.status !== "WAITING" && room.status !== "RESULT_PHASE") {
       throw new Error("현재 상태에서는 딜러룸 입력을 시작할 수 없습니다.");
     }
     room.status = "CHOOSING";

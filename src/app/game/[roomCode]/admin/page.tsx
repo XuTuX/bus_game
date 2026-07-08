@@ -38,6 +38,7 @@ const STATUS_LABELS = {
   WAITING: "턴 시작 대기",
   CHOOSING: "이동 카드 선택 중",
   ACTION_PHASE: "행동 선택 중",
+  RESULT_PHASE: "결과 확인",
   GAME_OVER: "게임 종료",
 } as const;
 
@@ -134,8 +135,20 @@ export default function AdminPage({
           hand: [],
         }));
   const canStartGame = participants.length > 0;
+  const subwaySubmissionValues = Object.values(state.pendingSubwayMoves ?? {});
+  const areSubwaysSubmitted =
+    subwaySubmissionValues.length === 0 || subwaySubmissionValues.every(Boolean);
+  const canEndTurn =
+    status === "ACTION_PHASE" &&
+    !!state.pendingActions?.BUS1 &&
+    !!state.pendingActions?.BUS2 &&
+    areSubwaysSubmitted;
   const timerButtonLabel =
-    status === "WAITING"
+    status === "RESULT_PHASE"
+      ? "다음 턴 시작"
+      : canEndTurn
+        ? "이번 턴 종료"
+        : status === "WAITING"
       ? "입력 시작"
       : status === "CHOOSING" || status === "ACTION_PHASE"
         ? "타이머 시작"
@@ -148,7 +161,7 @@ export default function AdminPage({
         : STATUS_LABELS[status];
   const currentTeamLabel = state.busTeam ? `${TEAM_LABELS[state.busTeam]} 팀` : "-";
   const runAdminAction = async (
-    action: "start_game" | "start"
+    action: "start_game" | "start" | "end_turn"
   ) => {
     if (busyAction) return;
 
@@ -180,7 +193,11 @@ export default function AdminPage({
         actionPhaseSeconds: Math.round(timerValue * 60),
       });
       setTimerDirty(false);
-      if (status === "WAITING") {
+      if (status === "RESULT_PHASE") {
+        await adminAction(roomCode, "start");
+      } else if (canEndTurn) {
+        await adminAction(roomCode, "end_turn");
+      } else if (status === "WAITING") {
         await adminAction(roomCode, "start");
       } else if (status === "CHOOSING" || status === "ACTION_PHASE") {
         await adminAction(roomCode, "start_timer");

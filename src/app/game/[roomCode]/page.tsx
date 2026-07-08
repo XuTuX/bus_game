@@ -4,13 +4,15 @@ import { use } from "react";
 import Board from "@/components/Board";
 import SubwayMovePreview from "@/components/SubwayMovePreview";
 import { usePhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
-import { COLOURS, getRoundColourOrder, type Colour, type GameState } from "@/lib/game";
+import { BusType, COLOURS, getRoundColourOrder, type Colour, type GameState } from "@/lib/game";
+import { type LogEntry } from "@/server/gameStore";
 
 const STATUS_LABELS = {
   LOBBY: "마스터 입력 대기",
   WAITING: "턴 시작 대기",
   CHOOSING: "이동 카드 선택 중",
   ACTION_PHASE: "행동 선택 중",
+  RESULT_PHASE: "결과 확인 중",
   GAME_OVER: "게임 종료",
 } as const;
 
@@ -39,8 +41,14 @@ export default function PublicBoardPage({
     );
   }
 
-  const { game, participants, status } = state;
+  const { game, participants, logs, status } = state;
   const subwayPreview = state.subwayPreview;
+  const latestTurnLog = logs[0];
+  const latestTurnLogs = latestTurnLog
+    ? logs
+        .filter((log) => log.round === latestTurnLog.round && log.turn === latestTurnLog.turn)
+        .reverse()
+    : [];
   const currentTeam = getRoundColourOrder(game.roundIndex)[game.turnIndex];
   const currentPlayers = game.players.filter((player) => player.team === currentTeam);
   const playerRooms = getCompactPlayerRooms(game, participants);
@@ -49,7 +57,7 @@ export default function PublicBoardPage({
   );
 
   return (
-    <div className={`public-layout ${subwayPreview?.submissions.length ? "" : "public-layout-no-right"}`}>
+    <div className={`public-layout ${subwayPreview?.submissions.length || (status === "RESULT_PHASE" && latestTurnLogs.length > 0) ? "" : "public-layout-no-right"}`}>
       <aside className="public-sidebar">
         <section className="public-compact-card">
           <h2 className="brand-font">현재 라운드</h2>
@@ -127,10 +135,86 @@ export default function PublicBoardPage({
         <Board game={game} subwayPreview={subwayPreview} />
       </main>
 
-      {subwayPreview && subwayPreview.submissions.length > 0 && (
+      {status === "RESULT_PHASE" && latestTurnLogs.length > 0 ? (
+        <aside className="public-sidebar public-sidebar-right">
+          <PublicTurnResult logs={latestTurnLogs} />
+        </aside>
+      ) : subwayPreview && subwayPreview.submissions.length > 0 ? (
         <aside className="public-sidebar public-sidebar-right">
           <SubwayMovePreview submissions={subwayPreview.submissions} />
         </aside>
+      ) : null}
+    </div>
+  );
+}
+
+function PublicTurnResult({ logs }: { logs: LogEntry[] }) {
+  const [firstLog] = logs;
+  const moveActions = logs
+    .filter((log) => log.phase === "MOVE" || !log.phase)
+    .flatMap((log) => log.actions);
+  const actionPhaseActions = logs
+    .filter((log) => log.phase === "ACTION")
+    .flatMap((log) => log.actions);
+  const bus1MoveActions = moveActions.filter(
+    (action) => action.bus === BusType.BUS1 && !action.actionLabel.includes("보너스")
+  );
+  const bus2MoveActions = moveActions.filter((action) => action.bus === BusType.BUS2);
+  const bonusActions = moveActions.filter((action) => action.actionLabel.includes("보너스"));
+  const bus1ActionActions = actionPhaseActions.filter(
+    (action) =>
+      action.bus === BusType.BUS1 &&
+      !action.actionLabel.startsWith("지하철") &&
+      !action.actionLabel.includes("점수")
+  );
+  const bus2ActionActions = actionPhaseActions.filter((action) => action.bus === BusType.BUS2);
+  const subwayActions = actionPhaseActions.filter((action) =>
+    action.actionLabel.startsWith("지하철")
+  );
+  const scoringActions = actionPhaseActions.filter((action) =>
+    action.actionLabel.includes("점수")
+  );
+
+  return (
+    <section className="public-compact-card public-turn-result-card">
+      <h2 className="brand-font">이번 턴 결과</h2>
+      <div className="public-turn-result-meta">R{firstLog.round} T{firstLog.turn}</div>
+      <ResultActionGroup title="1번 버스 이동" actions={bus1MoveActions} />
+      <ResultActionGroup title="2번 버스 이동" actions={bus2MoveActions} />
+      <ResultActionGroup title="1번 버스 행동" actions={bus1ActionActions} />
+      <ResultActionGroup title="2번 버스 행동" actions={bus2ActionActions} />
+      <ResultActionGroup
+        title="지하철 / 점수"
+        actions={[...subwayActions, ...scoringActions, ...bonusActions]}
+      />
+    </section>
+  );
+}
+
+function ResultActionGroup({
+  actions,
+  title,
+}: {
+  actions: LogEntry["actions"];
+  title: string;
+}) {
+  return (
+    <div className="public-result-group">
+      <h3 className="brand-font">{title}</h3>
+      {actions.length === 0 ? (
+        <p>기록 없음</p>
+      ) : (
+        actions.map((action, index) => (
+          <div className="public-result-action" key={`${title}-${index}`}>
+            <span>{action.actionLabel}</span>
+            <strong>
+              {action.applied ? "완료" : `실패 ${action.reason ?? ""}`}
+              {action.scoreGained !== 0
+                ? ` · ${action.scoreGained > 0 ? "+" : ""}${action.scoreGained}점`
+                : ""}
+            </strong>
+          </div>
+        ))
       )}
     </div>
   );

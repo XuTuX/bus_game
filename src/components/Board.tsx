@@ -22,11 +22,13 @@ export default function Board({
   game,
   showFacing = false,
   showFacingFor,
+  visibleBuses,
   subwayPreview,
 }: {
   game: GameState;
   showFacing?: boolean;
   showFacingFor?: BusType;
+  visibleBuses?: BusType[];
   subwayPreview?: {
     path: Coord[];
     finalPositions: Coord[];
@@ -48,8 +50,12 @@ export default function Board({
     }
   }
 
+  const visibleBusSet = visibleBuses ? new Set(visibleBuses) : null;
+  const isBusVisible = (busType: BusType) => !visibleBusSet || visibleBusSet.has(busType);
+
   const allWalls: (Wall & { busType: BusType })[] = [];
   for (const [busType, busState] of Object.entries(game.buses)) {
+    if (!isBusVisible(busType as BusType)) continue;
     for (const wall of busState.walls) {
       allWalls.push({ ...wall, busType: busType as BusType });
     }
@@ -83,8 +89,14 @@ export default function Board({
             );
             const hasObstacle = game.obstacles?.some(o => o.x === x && o.y === y);
             const isCenterBlocked = game.centerRulesActive && x === 4 && y === 4;
-            const hasBus1 = game.buses.BUS1?.pos.x === x && game.buses.BUS1?.pos.y === y;
-            const hasBus2 = game.buses.BUS2?.pos.x === x && game.buses.BUS2?.pos.y === y;
+            const hasBus1 =
+              isBusVisible(BusType.BUS1) &&
+              game.buses.BUS1?.pos.x === x &&
+              game.buses.BUS1?.pos.y === y;
+            const hasBus2 =
+              isBusVisible(BusType.BUS2) &&
+              game.buses.BUS2?.pos.x === x &&
+              game.buses.BUS2?.pos.y === y;
             const subwayTile = subwayTiles.get(`${x},${y}`);
 
             return (
@@ -177,7 +189,7 @@ export default function Board({
         })}
       </svg>
 
-      {Object.entries(game.buses).map(([busType, busState]) => {
+      {Object.entries(game.buses).filter(([busType]) => isBusVisible(busType as BusType)).map(([busType, busState]) => {
         const typedBusType = busType as BusType;
         const shouldShowFacing =
           showFacing && (!showFacingFor || showFacingFor === typedBusType);

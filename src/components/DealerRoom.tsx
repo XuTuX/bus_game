@@ -55,6 +55,7 @@ const STATUS_TEXT = {
   WAITING: "마스터가 딜러룸 입력을 시작할 때까지 대기하세요.",
   CHOOSING: "현재 차례입니다. 이동 옵션을 선택하고 제출하세요.",
   ACTION_PHASE: "이동이 완료되었습니다. 행동(교환/장애물)을 선택하세요.",
+  RESULT_PHASE: "이번 턴 결과 확인 중입니다. 마스터가 다음 턴을 시작할 때까지 대기하세요.",
   SUBMITTED: "제출 처리 중입니다.",
   REVEALED: "결과가 공개되었습니다.",
   GAME_OVER: "게임이 종료되었습니다.",
@@ -485,6 +486,7 @@ export default function DealerRoom({
             game={displayGame}
             showFacing={!!animatedGame}
             showFacingFor={activeBusType}
+            visibleBuses={roomBus ? [activeBusType] : undefined}
           />
           <div className="dealer-scoreboard-wrapper">
             <ScoreBoard game={game} showBusStatus={false} />

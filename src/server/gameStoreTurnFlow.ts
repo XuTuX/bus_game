@@ -1,13 +1,10 @@
 import {
   BusType,
-  COLOURS,
   cardLabel,
-  endOfRound,
   getConnectedComponentSize,
-  isGameOver,
-  nextRound,
   runActionPhase,
   runMovePhase,
+  scoreMatchingBusDestinationBonus,
   scoreSubwayTiles,
   type Card,
   type GameState,
@@ -168,7 +165,7 @@ function submitSubwayMovePhase(
   };
 
   if (room.status === "ACTION_PHASE") {
-    resolveActionPhaseIfReady(room);
+    return;
   }
 }
 
@@ -207,7 +204,18 @@ function resolveMovePhaseIfReady(room: RoomState) {
     );
   }
 
-  addTurnLog(room, actionDetails, room.game.roundIndex + 1, room.game.turnIndex + 1);
+  const beforeDestinationBonus = { ...clone.teamScores };
+  scoreMatchingBusDestinationBonus(
+    clone,
+    [bus1Player?.team, bus2Player?.team].filter(Boolean) as typeof clone.players[number]["team"][]
+  );
+  appendScoreDeltaLogActions(
+    actionDetails,
+    beforeDestinationBonus,
+    clone.teamScores,
+    "두 버스 같은 색 도착 보너스"
+  );
+  addTurnLog(room, actionDetails, room.game.roundIndex + 1, room.game.turnIndex + 1, "MOVE");
 
   room.game = clone;
   room.status = "ACTION_PHASE";
@@ -231,10 +239,14 @@ function submitActionPhase(
   if (!bus1Player) room.pendingActions.BUS1 = null;
   if (!bus2Player) room.pendingActions.BUS2 = null;
 
-  resolveActionPhaseIfReady(room);
+  return;
 }
 
-function resolveActionPhaseIfReady(room: RoomState) {
+export function finalizeTurnResult(room: RoomState) {
+  if (room.status !== "ACTION_PHASE") {
+    throw new Error("행동 단계에서만 이번 턴을 종료할 수 있습니다.");
+  }
+
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
   room.pendingSubwayMoves ??= {};
 
@@ -245,13 +257,13 @@ function resolveActionPhaseIfReady(room: RoomState) {
     room.pendingActions.BUS1 === undefined ||
     room.pendingActions.BUS2 === undefined
   ) {
-    return;
+    throw new Error("아직 두 버스의 행동 제출이 끝나지 않았습니다.");
   }
 
   const subwayTeams = getSubwayMoveTeams(room.game);
   const subwayPlayers = room.game.players.filter((p) => subwayTeams.includes(p.team));
   if (subwayPlayers.some((p) => !room.pendingSubwayMoves[p.id])) {
-    return;
+    throw new Error("아직 지하철 제출이 끝나지 않았습니다.");
   }
 
   const clone = deepClone(room.game);
@@ -277,34 +289,32 @@ function resolveActionPhaseIfReady(room: RoomState) {
     );
   }
 
+  const beforeRegionScores = { ...clone.teamScores };
   scoreCurrentBusRegions(clone);
+  appendScoreDeltaLogActions(
+    actionDetails,
+    beforeRegionScores,
+    clone.teamScores,
+    "버스 도착 칸 영역 점수"
+  );
 
   getOrderedSubwaySubmissions(room).forEach((submission) => {
     appendSubwayLogAction(actionDetails, clone, submission);
   });
 
+  const beforeSubwayScores = { ...clone.teamScores };
   scoreSubwayTiles(clone);
-  addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1);
-
-  clone.turnIndex = (clone.turnIndex + 1) % COLOURS.length;
-
-  if (endOfRound(clone)) {
-    nextRound(clone);
-  }
+  appendScoreDeltaLogActions(
+    actionDetails,
+    beforeSubwayScores,
+    clone.teamScores,
+    "지하철 통과 색상 점수"
+  );
+  addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1, "ACTION");
 
   room.game = clone;
-
-  if (isGameOver(room.game)) {
-    room.status = "GAME_OVER";
-    clearPhaseTimer(room);
-  } else if (endOfRound(room.game)) {
-    room.status = "WAITING";
-    clearPhaseTimer(room);
-  } else {
-    room.status = "CHOOSING";
-    startPhaseTimer(room, getRoomTimerSettings(room).movePhaseSeconds);
-  }
-
+  room.status = "RESULT_PHASE";
+  clearPhaseTimer(room);
   room.pendingActions = {};
   room.pendingSubwayMoves = {};
   room.subwaySubmissionCounter = 0;
@@ -395,6 +405,24 @@ function appendSubwayLogAction(
   });
 }
 
+function appendScoreDeltaLogActions(
+  actionDetails: LogEntry["actions"],
+  beforeScores: GameState["teamScores"],
+  afterScores: GameState["teamScores"],
+  label: string
+) {
+  for (const team of Object.keys(afterScores) as (keyof GameState["teamScores"])[]) {
+    const delta = afterScores[team] - beforeScores[team];
+    if (delta === 0) continue;
+    actionDetails.push({
+      actionLabel: `${label}: ${team}`,
+      bus: BusType.BUS1,
+      applied: true,
+      scoreGained: delta,
+    });
+  }
+}
+
 function subwayCardLabel(cardKind?: Card["kind"]): string {
   if (cardKind === "STRAIGHT1") return "직진 x 1";
   if (cardKind === "STRAIGHT2") return "직진 x 2";
@@ -445,13 +473,15 @@ function addTurnLog(
   room: RoomState,
   actions: LogEntry["actions"],
   round: number,
-  turn: number
+  turn: number,
+  phase: LogEntry["phase"]
 ) {
   const { bus1Player, bus2Player } = getTurnControllers(room.game);
   room.logs.unshift({
     id: ++room.logIdCounter,
     playerId: `${bus1Player?.name ?? "BUS1"} & ${bus2Player?.name ?? "BUS2"}`,
     team: "Blue",
+    phase,
     actions,
     round,
     turn,

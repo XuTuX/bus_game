@@ -30,6 +30,7 @@ export interface LogEntry {
   id: number;
   playerId: string;
   team: string;
+  phase?: "MOVE" | "ACTION";
   actions: {
     actionLabel: string;
     bus: BusType;
@@ -41,7 +42,13 @@ export interface LogEntry {
   turn: number;
 }
 
-export type RoomStatus = "LOBBY" | "WAITING" | "CHOOSING" | "ACTION_PHASE" | "GAME_OVER";
+export type RoomStatus =
+  | "LOBBY"
+  | "WAITING"
+  | "CHOOSING"
+  | "ACTION_PHASE"
+  | "RESULT_PHASE"
+  | "GAME_OVER";
 
 // 방 하나에 대해 서버가 저장하는 전체 진행 상태입니다.
 export interface RoomState {

@@ -20,8 +20,8 @@
   --team-red: #ff7675;
   --team-red-bg: rgba(255, 118, 117, 0.15);
   
-  --team-orange: #fab1a0;
-  --team-orange-bg: rgba(250, 177, 160, 0.15);
+  --team-orange: #a78bfa;
+  --team-orange-bg: rgba(167, 139, 250, 0.18);
 
   --team-yellow: #fdcb6e;
   --team-yellow-bg: rgba(253, 203, 110, 0.15);
@@ -2082,6 +2082,56 @@ h1, h2, h3, .brand-font {
 .public-player-chip-active {
   background: var(--team-blue-bg);
   border-color: var(--team-blue);
+}
+
+.public-turn-result-card {
+  display: grid;
+  gap: 10px;
+}
+
+.public-turn-result-meta {
+  color: var(--text-secondary);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.82rem;
+  margin-top: -4px;
+}
+
+.public-result-group {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  text-align: left;
+}
+
+.public-result-group h3 {
+  font-size: 0.86rem;
+}
+
+.public-result-group p {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.public-result-action {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+}
+
+.public-result-action span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.public-result-action strong {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
 }
 
 .subway-move-sequence {

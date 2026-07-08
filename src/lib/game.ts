@@ -466,17 +466,6 @@ export function runMovePhase(
           game.teamScores[tile.colour] += score;
           gained += score;
 
-          // Arrival check
-          if (!game.colorArrivals[busType].includes(tile.colour)) {
-            game.colorArrivals[busType].push(tile.colour);
-            if (result.logs) result.logs.push(`${tile.colour}이(가) ${busType}에 도착했습니다. 기본 점수 획득!`);
-            
-            const otherBus = busType === BusType.BUS1 ? BusType.BUS2 : BusType.BUS1;
-            if (game.colorArrivals[otherBus].includes(tile.colour)) {
-              game.teamScores[tile.colour] += 3; // Bonus
-              if (result.logs) result.logs.push(`${tile.colour}이(가) 두 버스에 모두 도착했습니다. 보너스 +3점!`);
-            }
-          }
         }
         result.scoreGained = gained;
       }
@@ -486,8 +475,11 @@ export function runMovePhase(
       const b2 = game.buses[BusType.BUS2].pos;
       const dist = Math.abs(b1.x - b2.x) + Math.abs(b1.y - b2.y);
       if (dist === 1 || dist === 2) {
-        game.teamScores[player.team] -= 1;
-        if (result.logs) result.logs.push(`버스 간 거리가 너무 가깝습니다! ${player.team}팀 -1점`);
+        const penalty = dist === 1 ? 5 : 2;
+        game.teamScores[player.team] -= penalty;
+        if (result.logs) {
+          result.logs.push(`버스 간 거리가 ${dist}칸입니다. ${player.team}팀 -${penalty}점`);
+        }
       }
     }
     
@@ -522,6 +514,28 @@ export function scoreSubwayTiles(game: GameState): void {
     game.teamScores[colour] += 1;
     game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
   }
+}
+
+export function scoreMatchingBusDestinationBonus(
+  game: GameState,
+  recipientTeams: Colour[]
+): void {
+  const bus1Pos = game.buses[BusType.BUS1].pos;
+  const bus2Pos = game.buses[BusType.BUS2].pos;
+  const bus1Colour = game.board[bus1Pos.y]?.[bus1Pos.x]?.colour;
+  const bus2Colour = game.board[bus2Pos.y]?.[bus2Pos.x]?.colour;
+
+  if (!bus1Colour || bus1Colour !== bus2Colour) {
+    return;
+  }
+
+  const uniqueTeams = [...new Set(recipientTeams)];
+  for (const team of uniqueTeams) {
+    game.teamScores[team] += 2;
+  }
+  game.logs.push(
+    `두 버스가 모두 ${bus1Colour} 칸에 도착했습니다. 현재 조작 팀 ${uniqueTeams.join(", ")} +2점`
+  );
 }
 
 export function runActionPhase(
