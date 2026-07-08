@@ -10,6 +10,7 @@ import {
   adminStartGame,
   adminStartRoomTimer,
   adminStartTurn,
+  adminRevert,
 } from "@/server/gameStore";
 import { Colour, type CardKind } from "@/lib/game";
 import { getErrorMessage } from "@/server/apiError";
@@ -32,7 +33,8 @@ export async function POST(
         | "start_game"
         | "start"
         | "end_turn"
-        | "start_timer";
+        | "start_timer"
+        | "revert";
       name?: string;
       playerId?: string;
       colour?: Colour;
@@ -78,6 +80,8 @@ export async function POST(
       await adminEndTurn(roomCode);
     } else if (action === "start_timer") {
       await adminStartRoomTimer(roomCode);
+    } else if (action === "revert") {
+      await adminRevert(roomCode);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

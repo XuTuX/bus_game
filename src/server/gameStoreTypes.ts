@@ -71,6 +71,7 @@ export interface RoomState {
   phaseDeadlineAt?: number;
   phaseDurationSeconds?: number;
   timerSettings?: RoomTimerSettings;
+  history?: string[];
 }
 
 export interface RoomTimerSettings {

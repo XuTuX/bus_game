@@ -17,7 +17,7 @@ export async function POST(
       playerId: string;
       actions: TurnAction[];
       bus?: any;
-      mode?: "BUS" | "SUBWAY";
+      mode?: "BUS" | "SUBWAY" | "CANCEL" | "CANCEL_SUBWAY";
     };
 
     if (!playerId) {

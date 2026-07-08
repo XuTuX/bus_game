@@ -54,6 +54,7 @@ export function buildPublicState(record: RoomRecord) {
     subwayTeamPlayers,
     pendingSubwayMoves,
     subwayPreview: buildSubwayPreview(room),
+    canUndo: (room.history?.length ?? 0) > 0,
     ...getRoomTimingMeta(record),
   };
 }

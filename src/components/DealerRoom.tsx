@@ -370,6 +370,22 @@ export default function DealerRoom({
     }
   };
 
+  // Handle Cancel Submission
+  const handleCancelSubmission = async (bus: BusType) => {
+    if (!resolvedPlayerId || submitting) return;
+    if (!confirm("정말 제출을 취소하시겠습니까?")) return;
+    
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      await submitAction(roomCode, resolvedPlayerId, [], bus, "CANCEL");
+    } catch (e: any) {
+      setErrorMsg(e.message || "제출 취소에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Role subtitle text
   const getRoleSubtitle = () => {
     if (roomBus) return `(${roomBusLabel} 전용 방)`;
@@ -450,6 +466,11 @@ export default function DealerRoom({
                   <span>1번 버스 제출 상태: {isBus1Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                   <span>2번 버스 제출 상태: {isBus2Submitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
+                {isSelectedBusController && (
+                  <button className="btn btn-ghost" style={{ marginTop: 16, width: "100%", color: "var(--team-red)", borderColor: "var(--team-red)" }} onClick={() => handleCancelSubmission(activeBusType)} disabled={submitting}>
+                    제출 취소하기
+                  </button>
+                )}
               </div>
             ) : (status === "CHOOSING" || status === "ACTION_PHASE") && hasISubmittedAction ? (
               <div className="dealer-wait-card">
@@ -463,6 +484,11 @@ export default function DealerRoom({
                   <span>1번 버스 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                   <span>2번 버스 행동 제출: {isBus2ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                 </div>
+                {isSelectedBusController && (
+                  <button className="btn btn-ghost" style={{ marginTop: 16, width: "100%", color: "var(--team-red)", borderColor: "var(--team-red)" }} onClick={() => handleCancelSubmission(activeBusType)} disabled={submitting}>
+                    제출 취소하기
+                  </button>
+                )}
               </div>
             ) : !canAct ? (
               <div className="dealer-wait-card">

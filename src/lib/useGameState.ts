@@ -56,6 +56,7 @@ export type PublicStateResult = {
     path: Coord[];
     finalPositions: Coord[];
   };
+  canUndo?: boolean;
 } & TimingState;
 
 export type PrivateStateResult = {
@@ -168,7 +169,7 @@ export async function submitAction(
   playerId: string,
   actions: TurnAction[],
   bus?: BusType,
-  mode?: "BUS" | "SUBWAY"
+  mode?: "BUS" | "SUBWAY" | "CANCEL" | "CANCEL_SUBWAY"
 ) {
   const res = await fetch(`/api/game/${roomCode}/action`, {
     method: "POST",
@@ -185,7 +186,7 @@ export async function submitAction(
 
 export async function adminAction(
   roomCode: string,
-  action: "start_game" | "start" | "end_turn" | "start_timer"
+  action: "start_game" | "start" | "end_turn" | "start_timer" | "revert"
 ) {
   const res = await fetch(`/api/game/${roomCode}/admin`, {
     method: "POST",

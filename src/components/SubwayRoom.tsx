@@ -180,6 +180,26 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
     }
   };
 
+  const handleCancelSubmission = async () => {
+    if (!selectedPlayerId || submitting) return;
+    if (!confirm("정말 지하철 제출을 취소하시겠습니까?")) return;
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      await submitAction(
+        roomCode,
+        selectedPlayerId,
+        [],
+        selectedSubway,
+        "CANCEL_SUBWAY"
+      );
+    } catch (e: any) {
+      setErrorMsg(e.message || "제출 취소에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!publicState || !game) {
     return (
       <div className="dealer-layout">
@@ -342,6 +362,14 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                     ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
                     : "선택하신 플레이어의 지하철 입력이 이미 접수되었습니다."}
                 </p>
+                <button
+                  className="btn btn-ghost"
+                  style={{ marginTop: 16, width: "100%", color: "var(--team-red)", borderColor: "var(--team-red)" }}
+                  onClick={handleCancelSubmission}
+                  disabled={submitting}
+                >
+                  제출 취소하기
+                </button>
               </div>
             ) : (
               <>

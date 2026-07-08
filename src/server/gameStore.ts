@@ -252,8 +252,32 @@ export async function submitTurn(
   });
 }
 
+function pushHistory(room: RoomState) {
+  const history = room.history ?? [];
+  delete room.history;
+  const snapshot = JSON.stringify(room);
+  history.push(snapshot);
+  if (history.length > 5) {
+    history.shift();
+  }
+  room.history = history;
+}
+
+export async function adminRevert(roomCode: string): Promise<void> {
+  await mutateRoom(roomCode, (room) => {
+    if (!room.history || room.history.length === 0) {
+      throw new Error("되돌릴 수 있는 이전 상태가 없습니다.");
+    }
+    const previousSnapshot = room.history.pop()!;
+    const parsed = JSON.parse(previousSnapshot) as RoomState;
+    Object.assign(room, parsed);
+    room.history = room.history; // retain remaining history
+  });
+}
+
 export async function adminEndTurn(roomCode: string): Promise<void> {
   await mutateRoom(roomCode, (room) => {
+    pushHistory(room);
     finalizeTurnResult(room);
   });
 }
@@ -296,6 +320,7 @@ export async function adminStartGame(roomCode: string): Promise<void> {
 
 export async function adminStartTurn(roomCode: string): Promise<void> {
   await mutateRoom(roomCode, (room) => {
+    pushHistory(room);
     if (room.status === "RESULT_PHASE") {
       room.game.turnIndex = (room.game.turnIndex + 1) % COLOURS.length;
       if (endOfRound(room.game)) {

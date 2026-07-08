@@ -163,7 +163,7 @@ export default function AdminPage({
         : STATUS_LABELS[status];
   const currentTeamLabel = state.busTeam ? `${TEAM_LABELS[state.busTeam]} 팀` : "-";
   const runAdminAction = async (
-    action: "start_game" | "start" | "end_turn"
+    action: "start_game" | "start" | "end_turn" | "revert"
   ) => {
     if (busyAction) return;
 
@@ -354,6 +354,23 @@ export default function AdminPage({
               {savingTimers ? "처리 중" : timerButtonLabel}
             </button>
           </div>
+
+          {state.canUndo && (
+            <div style={{ marginTop: 16 }}>
+              <button
+                className="btn btn-ghost"
+                disabled={busyAction}
+                onClick={() => {
+                  if (confirm("이전 상태로 되돌리시겠습니까? 최근의 턴 진행이나 결과 계산이 취소됩니다.")) {
+                    runAdminAction("revert");
+                  }
+                }}
+                style={{ width: "100%", color: "var(--team-red)", borderColor: "var(--team-red)" }}
+              >
+                이전 턴/상태로 되돌리기 (Undo)
+              </button>
+            </div>
+          )}
 
           {errorMsg && <div className="error-box">{errorMsg}</div>}
 
