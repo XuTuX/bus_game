@@ -53,19 +53,23 @@ export default function Board({
               (pair[0].x === x && pair[0].y === y) || (pair[1].x === x && pair[1].y === y)
             );
             const hasObstacle = game.obstacles?.some(o => o.x === x && o.y === y);
+            const isCenterBlocked = game.centerRulesActive && x === 4 && y === 4;
 
             return (
               <div
                 key={`${x}-${y}`}
                 className={`tile tile-${tile.colour ?? 'gray'}${
                   scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
-                } ${isSwapped ? "tile-swapped" : ""}`}
+                } ${isSwapped ? "tile-swapped" : ""} ${isCenterBlocked ? "tile-center-blocked" : ""}`}
               >
                 {tile.scoreBonus ? (
                   <span className="tile-bonus">+{1 + tile.scoreBonus}</span>
                 ) : null}
                 {hasObstacle ? (
                   <span className="tile-obstacle" style={{ fontSize: "24px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }}>🚧</span>
+                ) : null}
+                {isCenterBlocked ? (
+                  <span className="tile-center-blocked-label">벽</span>
                 ) : null}
               </div>
             );
@@ -118,11 +122,11 @@ export default function Board({
         const shouldShowFacing =
           showFacing && (!showFacingFor || showFacingFor === typedBusType);
         const step = tileSize + tileGap;
-        const width = shouldShowFacing ? 38 : 28;
+        const width = 68;
         const height = shouldShowFacing ? 26 : 28;
         const left = 12 + busState.pos.x * step + tileSize / 2 - width / 2;
         const top = 12 + busState.pos.y * step + tileSize / 2 - height / 2;
-        const offset = busType === BusType.BUS1 ? -4 : 4;
+        const offset = busType === BusType.BUS1 ? -18 : 18;
         const rotation = FACING_ROTATION[busState.facing] ?? 0;
 
         return (
@@ -138,7 +142,7 @@ export default function Board({
             }}
           >
             <span className="bus-marker-label">
-              {busType === BusType.BUS1 ? "1" : "2"}
+              {busType === BusType.BUS1 ? "1번 버스" : "2번 버스"}
             </span>
             {shouldShowFacing && <span className="bus-marker-head" />}
           </div>
@@ -174,7 +178,7 @@ export default function Board({
             className={`subway-preview-final ${index === 0 ? "subway-preview-final-head" : ""}`}
             style={{ left, top }}
           >
-            {index === 0 ? "NEXT" : ""}
+            {index === 0 ? "▶" : ""}
           </div>
         );
       })}
@@ -213,7 +217,7 @@ export default function Board({
                   border: isFaded ? "none" : "2px solid rgba(255,255,255,0.7)",
                 }}
               >
-                {index === 0 ? (isBus1 ? "S1" : "S2") : ""}
+                {index === 0 ? "🚇" : ""}
               </div>
             );
           });

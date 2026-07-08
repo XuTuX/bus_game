@@ -1,6 +1,5 @@
 import {
   BusType,
-  cardLabel,
   stepSubway,
   type Card,
   type CardKind,
@@ -240,5 +239,10 @@ function buildSubwayPreview(room: RoomState) {
 }
 
 function subwaySubmissionLabel(cardKind?: CardKind): string {
-  return cardKind ? cardLabel({ kind: cardKind }) : "패스";
+  if (!cardKind) return "패스";
+  if (cardKind === "STRAIGHT1") return "직진 x 1";
+  if (cardKind === "STRAIGHT2") return "직진 x 2";
+  if (cardKind === "STRAIGHT3") return "직진 x 3";
+  if (cardKind === "LEFT") return "좌회전";
+  return "우회전";
 }

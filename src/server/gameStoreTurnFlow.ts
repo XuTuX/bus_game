@@ -382,18 +382,26 @@ function appendSubwayLogAction(
     subway: true,
     cardIndex,
   };
-  const handCopy = [...player.hand];
   const [result] = runMovePhase(player, [moveAction], game, {
     scoreSubwaysAtEnd: false,
   });
 
   actionDetails.push({
-    actionLabel: `${subwayLabel} ${actionLabel(moveAction, handCopy)}`,
+    actionLabel: `${subwayLabel} ${subwayCardLabel(submission.cardKind)}`,
     bus: BusType.BUS1,
     applied: result.applied,
     reason: result.reason,
     scoreGained: result.scoreGained ?? 0,
   });
+}
+
+function subwayCardLabel(cardKind?: Card["kind"]): string {
+  if (cardKind === "STRAIGHT1") return "직진 x 1";
+  if (cardKind === "STRAIGHT2") return "직진 x 2";
+  if (cardKind === "STRAIGHT3") return "직진 x 3";
+  if (cardKind === "LEFT") return "좌회전";
+  if (cardKind === "RIGHT") return "우회전";
+  return "이동";
 }
 
 function getOrderedSubwaySubmissions(room: RoomState): SubwayMoveSubmission[] {

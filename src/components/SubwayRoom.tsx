@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Board from "@/components/Board";
 import ScoreBoard from "@/components/ScoreBoard";
+import SubwayMovePreview, { SubwayMoveGlyph } from "@/components/SubwayMovePreview";
 import {
   BusType,
   type CardKind,
@@ -17,14 +18,6 @@ import {
   usePrivateGame,
   usePublicGame,
 } from "@/lib/useGameState";
-
-const CARD_ICONS: Record<CardKind, string> = {
-  STRAIGHT1: "➡️",
-  STRAIGHT2: "⏩",
-  STRAIGHT3: "⏭️",
-  LEFT: "↩️",
-  RIGHT: "↪️",
-};
 
 const CARD_NAMES: Record<CardKind, string> = {
   STRAIGHT1: "1칸 직진",
@@ -82,6 +75,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
     () => publicState?.pendingSubwayMoves ?? {},
     [publicState?.pendingSubwayMoves]
   );
+  const subwayPreview = publicState?.subwayPreview;
 
   const [selectedTeam, setSelectedTeam] = useState<Colour | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
@@ -92,6 +86,8 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   const selectedTeamPlayers = selectedTeam ? subwayTeamPlayers[selectedTeam] ?? [] : [];
   const selectedPrivateState = usePrivateGame(roomCode, selectedPlayerId);
   const hand = selectedPrivateState?.hand ?? [];
+  const activeSubway = game?.subways?.[BusType.BUS1];
+  const subwayHead = activeSubway?.pos[0];
 
   const selectedSubway = useMemo(() => {
     return BusType.BUS1;
@@ -136,6 +132,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
 
   const getCardCount = (kind: CardKind) =>
     hand.filter((card) => card.kind === kind).length;
+  const selectedKindName = selectedKind ? CARD_NAMES[selectedKind] : "";
 
   const handleSubmitCard = async () => {
     if (!canSubmit || !selectedKind) return;
@@ -215,10 +212,45 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
             <h2 className="brand-font">보드판</h2>
             <span>단일 지하철 위치를 확인하세요</span>
           </div>
-          <Board game={game} showFacing={false} showFacingFor={selectedSubway} />
+          <Board
+            game={game}
+            showFacing={false}
+            showFacingFor={selectedSubway}
+            subwayPreview={subwayPreview}
+          />
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
+          <section className="dealer-panel subway-location-panel">
+            <div className="dealer-pane-heading" style={{ marginBottom: 12 }}>
+              <h2 className="brand-font">현재 지하철</h2>
+              <span>보드 위 🚇 위치</span>
+            </div>
+            <div className="subway-location-grid">
+              <div>
+                <span>머리 위치</span>
+                <strong>
+                  {subwayHead ? `(${subwayHead.x}, ${subwayHead.y})` : "-"}
+                </strong>
+              </div>
+              <div>
+                <span>길이</span>
+                <strong>{activeSubway?.pos.length ?? 0}</strong>
+              </div>
+              <div>
+                <span>제출</span>
+                <strong>{subwayPreview?.submissions.length ?? 0}</strong>
+              </div>
+            </div>
+          </section>
+
+          {subwayPreview && subwayPreview.submissions.length > 0 && (
+            <SubwayMovePreview
+              submissions={subwayPreview.submissions}
+              title="지하철 이동 예정"
+            />
+          )}
+
           <section className="dealer-panel dealer-hand-pane">
             <div className="dealer-pane-heading" style={{ marginBottom: 16 }}>
               <h2 className="brand-font">지하철 입력</h2>
@@ -316,7 +348,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                         }}
                       >
                         <div className="grouped-card-info">
-                          <span style={{ fontSize: "1.3rem" }}>{CARD_ICONS[kind]}</span>
+                          <SubwayMoveGlyph cardKind={kind} />
                           <div>
                             <strong style={{ fontSize: "0.95rem" }}>{CARD_NAMES[kind]}</strong>
                           </div>
@@ -327,6 +359,26 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                   })}
                 </div>
 
+                <div className="selected-tray subway-selected-tray">
+                  {selectedKind ? (
+                    <div className="selected-chip subway-selected-chip">
+                      <SubwayMoveGlyph cardKind={selectedKind} />
+                      <span>{selectedKindName} 제출 예정</span>
+                      <button
+                        className="chip-remove"
+                        onClick={() => setSelectedKind(null)}
+                        disabled={submitting}
+                        type="button"
+                        aria-label="선택한 지하철 이동 제거"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="selected-empty">제출할 지하철 이동 카드를 선택하세요</div>
+                  )}
+                </div>
+
                 <div className="dealer-submit-row">
                   <button
                     className="btn btn-primary"
@@ -334,7 +386,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                     disabled={!canSubmit || !selectedKind}
                     style={{ flex: 2 }}
                   >
-                    {submitting ? "제출 중..." : "카드 1장 제출"}
+                    {submitting ? "제출 중..." : selectedKind ? `${selectedKindName} 제출` : "카드 1장 제출"}
                   </button>
                   <button
                     className="btn btn-ghost"
