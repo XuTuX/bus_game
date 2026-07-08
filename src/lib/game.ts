@@ -672,7 +672,7 @@ export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): 
           { x: 0, y: 0 },
         ],
         facing: Facing.E,
-        active: false,
+        active: true,
       },
       [BusType.BUS2]: {
         pos: [],
