@@ -8,7 +8,7 @@ import {
   getResponseErrorMessage,
   parseJsonResponse,
 } from "@/lib/apiClient";
-import { type Card, type Colour, type TurnAction, BusType } from "@/lib/game";
+import { type Card, type CardKind, type Colour, type Coord, type TurnAction, BusType } from "@/lib/game";
 
 export type TimingState = {
   serverNow: number;
@@ -44,6 +44,18 @@ export type PublicStateResult = {
     roomIndex: number;
   }[]>>;
   pendingSubwayMoves?: Record<string, boolean>;
+  subwayPreview?: {
+    submissions: {
+      playerId: string;
+      playerName?: string;
+      team: Colour;
+      cardKind?: CardKind;
+      label: string;
+      submittedOrder: number;
+    }[];
+    path: Coord[];
+    finalPositions: Coord[];
+  };
 } & TimingState;
 
 export type PrivateStateResult = {
@@ -259,6 +271,25 @@ export async function adminSetTimers(
   if (!res.ok) {
     throw new Error(
       await getResponseErrorMessage(res, "Failed to set timers")
+    );
+  }
+}
+
+export async function adminGiveCards(
+  roomCode: string,
+  playerId: string,
+  cardKind: CardKind,
+  count: number
+) {
+  const res = await fetch(`/api/game/${roomCode}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "give_cards", playerId, cardKind, count }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      await getResponseErrorMessage(res, "Failed to give cards")
     );
   }
 }

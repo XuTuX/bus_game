@@ -12,10 +12,12 @@ export type ActionPhaseTurnAction = SwapTileTurnAction | PlaceObstacleTurnAction
 
 export interface SubwayMoveSubmission {
   playerId: string;
+  playerName?: string;
   team: Colour;
   subway: BusType;
   action: MoveTurnAction | null;
   cardKind?: CardKind;
+  submittedOrder: number;
 }
 
 export interface LobbyParticipant {
@@ -54,6 +56,7 @@ export interface RoomState {
     BUS2?: MoveTurnAction[];
   };
   pendingSubwayMoves: Record<string, SubwayMoveSubmission>;
+  subwaySubmissionCounter?: number;
   pendingActions: {
     BUS1?: ActionPhaseTurnAction | null;
     BUS2?: ActionPhaseTurnAction | null;

@@ -41,7 +41,7 @@ export default async function DealerRoomPage({
 
           <section className="home-section">
             <h2 className="brand-font">지하철 조작 창</h2>
-            <p>버스 조작 팀을 제외한 팀들이 1호선/2호선 지하철 카드를 제출합니다.</p>
+            <p>버스 조작 팀을 제외한 팀들이 단일 지하철 카드를 제출합니다.</p>
             <Link
               className="btn btn-primary"
               href={`/dealer/${roomCode}/subway`}

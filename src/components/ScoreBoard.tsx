@@ -87,7 +87,9 @@ export default function ScoreBoard({
               );
             })}
 
-            {game.subways && Object.entries(game.subways).map(([busType, subway]) => (
+            {game.subways && Object.entries(game.subways)
+              .filter(([, subway]) => subway.active && subway.pos.length > 0)
+              .map(([busType, subway]) => (
               <div className="score-item" key={busType} style={{ gap: 8 }}>
                 <div
                   style={{
@@ -100,7 +102,7 @@ export default function ScoreBoard({
                 />
                 <div style={{ flex: 1, textAlign: "left" }}>
                   <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                    {busType === BusType.BUS1 ? "1호선" : "2호선"} (길이 {subway.pos.length})
+                    지하철 (길이 {subway.pos.length})
                   </div>
                   <div
                     style={{

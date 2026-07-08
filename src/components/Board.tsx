@@ -1,4 +1,4 @@
-import { BusType, BOARD_SIZE, type GameState, type Wall } from "@/lib/game";
+import { BusType, BOARD_SIZE, type Coord, type GameState, type Wall } from "@/lib/game";
 
 const FACING_ROTATION: Record<string, number> = {
   N: -90,
@@ -11,10 +11,15 @@ export default function Board({
   game,
   showFacing = false,
   showFacingFor,
+  subwayPreview,
 }: {
   game: GameState;
   showFacing?: boolean;
   showFacingFor?: BusType;
+  subwayPreview?: {
+    path: Coord[];
+    finalPositions: Coord[];
+  };
 }) {
   const tileSize = 56;
   const tileGap = 3;
@@ -140,7 +145,42 @@ export default function Board({
         );
       })}
 
+      {subwayPreview?.path?.map((pos, index) => {
+        const step = tileSize + tileGap;
+        const left = 12 + pos.x * step + tileSize / 2 - 9;
+        const top = 12 + pos.y * step + tileSize / 2 - 9;
+        return (
+          <div
+            key={`subway-preview-path-${index}`}
+            className="subway-preview-dot"
+            style={{
+              left,
+              top,
+              opacity: Math.max(0.35, 1 - index * 0.08),
+            }}
+          >
+            {index + 1}
+          </div>
+        );
+      })}
+
+      {subwayPreview?.finalPositions?.map((pos, index) => {
+        const step = tileSize + tileGap;
+        const left = 12 + pos.x * step + tileSize / 2 - 14;
+        const top = 12 + pos.y * step + tileSize / 2 - 14;
+        return (
+          <div
+            key={`subway-preview-final-${index}`}
+            className={`subway-preview-final ${index === 0 ? "subway-preview-final-head" : ""}`}
+            style={{ left, top }}
+          >
+            {index === 0 ? "NEXT" : ""}
+          </div>
+        );
+      })}
+
       {game.subways && Object.entries(game.subways)
+        .filter(([, subway]) => subway.active && subway.pos.length > 0)
         .map(([busType, subway]) => {
           const isFaded = showFacingFor && showFacingFor !== busType;
           return subway.pos.map((pos, index) => {
@@ -153,7 +193,6 @@ export default function Board({
                 key={`subway-${busType}-${index}`}
                 className={`subway-marker subway-marker-${busType}`}
                 style={{
-                  position: "absolute",
                   width: 24,
                   height: 24,
                   background: index === 0 

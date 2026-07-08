@@ -34,6 +34,7 @@ export default function PublicBoardPage({
   }
 
   const { game, participants, logs, status, activePlayerNames } = state;
+  const subwayPreview = state.subwayPreview;
 
   return (
     <div className="public-layout">
@@ -74,10 +75,29 @@ export default function PublicBoardPage({
             {phaseTimeLabel ? ` · ${phaseTimeLabel}` : ""}
           </div>
         </div>
-        <Board game={game} />
+        <Board game={game} subwayPreview={subwayPreview} />
       </main>
 
       <aside className="public-sidebar public-sidebar-right">
+        {subwayPreview && subwayPreview.submissions.length > 0 && (
+          <div className="status-panel">
+            <h2>지하철 예정 이동</h2>
+            <div className="players-list">
+              {subwayPreview.submissions.map((submission, index) => (
+                <div className="score-item" key={`${submission.playerId}-${submission.submittedOrder}`}>
+                  <span className="seat-number">{index + 1}</span>
+                  <span className={`score-dot score-dot-${submission.team}`} />
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <strong>{submission.playerName ?? submission.playerId}</strong>
+                    <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginTop: 2 }}>
+                      {submission.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <ScoreBoard game={game} showBusStatus={false} />
       </aside>
     </div>

@@ -1,4 +1,11 @@
-import { type Card } from "@/lib/game";
+import {
+  BusType,
+  cardLabel,
+  stepSubway,
+  type Card,
+  type CardKind,
+  type Coord,
+} from "@/lib/game";
 import { getRoomTimerSettings } from "./gameStoreTimers";
 import {
   type RoomRecord,
@@ -45,6 +52,7 @@ export function buildPublicState(record: RoomRecord) {
     subwayMoveTeams,
     subwayTeamPlayers,
     pendingSubwayMoves,
+    subwayPreview: buildSubwayPreview(room),
     ...getRoomTimingMeta(record),
   };
 }
@@ -185,4 +193,52 @@ function getVisiblePrivateHand(room: RoomState, playerId?: string): Card[] {
   }
 
   return hand;
+}
+
+function buildSubwayPreview(room: RoomState) {
+  const submissions = Object.values(room.pendingSubwayMoves ?? {})
+    .sort((a, b) => (a.submittedOrder ?? 0) - (b.submittedOrder ?? 0))
+    .map((submission) => {
+      const player =
+        room.game.players.find((p) => p.id === submission.playerId) ??
+        room.participants.find((p) => p.id === submission.playerId);
+      return {
+        playerId: submission.playerId,
+        playerName: submission.playerName ?? player?.name,
+        team: submission.team,
+        cardKind: submission.cardKind,
+        label: subwaySubmissionLabel(submission.cardKind),
+        submittedOrder: submission.submittedOrder ?? 0,
+      };
+    });
+
+  if (submissions.length === 0) {
+    return undefined;
+  }
+
+  const clone = deepClone(room.game);
+  const subway = clone.subways[BusType.BUS1];
+  const path: Coord[] = [];
+
+  if (subway?.active) {
+    for (const submission of Object.values(room.pendingSubwayMoves ?? {}).sort(
+      (a, b) => (a.submittedOrder ?? 0) - (b.submittedOrder ?? 0)
+    )) {
+      if (!submission.cardKind) continue;
+      const result = stepSubway(subway, { kind: submission.cardKind });
+      if (result.path) {
+        path.push(...result.path);
+      }
+    }
+  }
+
+  return {
+    submissions,
+    path,
+    finalPositions: subway?.pos ?? [],
+  };
+}
+
+function subwaySubmissionLabel(cardKind?: CardKind): string {
+  return cardKind ? cardLabel({ kind: cardKind }) : "패스";
 }

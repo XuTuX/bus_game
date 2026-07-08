@@ -1,6 +1,7 @@
 import {
   Colour,
   COLOURS,
+  type CardKind,
   MAX_PLAYERS,
   MAX_PLAYERS_PER_COLOUR,
   BusType,
@@ -37,6 +38,13 @@ export type {
 
 const roomTtlSeconds = 12 * 60 * 60;
 const SAVE_RETRY_LIMIT = 5;
+const CARD_KINDS: CardKind[] = [
+  "STRAIGHT1",
+  "STRAIGHT2",
+  "STRAIGHT3",
+  "LEFT",
+  "RIGHT",
+];
 
 const redisUrl = process.env.REDIS_URL?.trim();
 const redisRestUrl = (
@@ -187,6 +195,35 @@ export async function adminSetRoomTimers(
   });
 }
 
+export async function adminGivePlayerCards(
+  roomCode: string,
+  playerId: string,
+  cardKind: CardKind,
+  count: number
+): Promise<void> {
+  await mutateRoom(roomCode, (room) => {
+    if (room.status === "LOBBY") {
+      throw new Error("게임 시작 후 카드 지급이 가능합니다.");
+    }
+    if (!CARD_KINDS.includes(cardKind)) {
+      throw new Error("유효하지 않은 카드입니다.");
+    }
+
+    const safeCount = Math.max(1, Math.min(10, Math.floor(count || 1)));
+    const player = room.game.players.find((p) => p.id === playerId);
+    if (!player) {
+      throw new Error("플레이어를 찾을 수 없습니다.");
+    }
+
+    for (let i = 0; i < safeCount; i += 1) {
+      player.hand.push({ kind: cardKind });
+    }
+    room.game.logs.push(
+      `마스터가 ${player.name ?? player.id}에게 ${cardKind} 카드 ${safeCount}장을 지급했습니다.`
+    );
+  });
+}
+
 export async function adminStartRoomTimer(roomCode: string): Promise<void> {
   await mutateRoom(roomCode, (room) => {
     const timerSettings = getRoomTimerSettings(room);
@@ -261,6 +298,7 @@ export async function adminStartTurn(roomCode: string): Promise<void> {
     room.status = "CHOOSING";
     room.pendingMoves = {};
     room.pendingSubwayMoves = {};
+    room.subwaySubmissionCounter = 0;
     room.pendingActions = {};
     startPhaseTimer(room, getRoomTimerSettings(room).movePhaseSeconds);
   });
@@ -334,6 +372,7 @@ function createEmptyRoom(): RoomState {
     playerIdCounter: idCounter,
     pendingMoves: {},
     pendingSubwayMoves: {},
+    subwaySubmissionCounter: 0,
     pendingActions: {},
     timerSettings: getDefaultTimerSettings(),
   };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   adminAddParticipant,
+  adminGivePlayerCards,
   adminRemoveParticipant,
   adminSetRoomTimers,
   adminSetParticipantColour,
@@ -9,7 +10,7 @@ import {
   adminStartRoomTimer,
   adminStartTurn,
 } from "@/server/gameStore";
-import { Colour } from "@/lib/game";
+import { Colour, type CardKind } from "@/lib/game";
 import { getErrorMessage } from "@/server/apiError";
 
 export async function POST(
@@ -26,12 +27,15 @@ export async function POST(
         | "set_player_colour"
         | "update_player_name"
         | "set_timers"
+        | "give_cards"
         | "start_game"
         | "start"
         | "start_timer";
       name?: string;
       playerId?: string;
       colour?: Colour;
+      cardKind?: CardKind;
+      count?: number;
       movePhaseSeconds?: number;
       actionPhaseSeconds?: number;
     };
@@ -57,6 +61,13 @@ export async function POST(
         movePhaseSeconds: Number(body.movePhaseSeconds),
         actionPhaseSeconds: Number(body.actionPhaseSeconds),
       });
+    } else if (action === "give_cards") {
+      await adminGivePlayerCards(
+        roomCode,
+        String(body.playerId ?? ""),
+        body.cardKind as CardKind,
+        Number(body.count ?? 1)
+      );
     } else if (action === "start_game") {
       await adminStartGame(roomCode);
     } else if (action === "start") {

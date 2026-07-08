@@ -94,9 +94,8 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
   const hand = selectedPrivateState?.hand ?? [];
 
   const selectedSubway = useMemo(() => {
-    const activePlayerOption = selectedTeamPlayers.find((p) => p.playerId === selectedPlayerId);
-    return activePlayerOption ? activePlayerOption.room : BusType.BUS1;
-  }, [selectedTeamPlayers, selectedPlayerId]);
+    return BusType.BUS1;
+  }, []);
 
   const isSelectedPlayerSubmitted = selectedPlayerId
     ? !!pendingSubwayMoves[selectedPlayerId]
@@ -114,11 +113,13 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
 
   useEffect(() => {
     const firstOpenTeam =
-      subwayTeams.find((team) => !pendingSubwayMoves[team]) ?? subwayTeams[0] ?? null;
+      subwayTeams.find((team) =>
+        (subwayTeamPlayers[team] ?? []).some((player) => !pendingSubwayMoves[player.playerId])
+      ) ?? subwayTeams[0] ?? null;
     setSelectedTeam((current) =>
       current && subwayTeams.includes(current) ? current : firstOpenTeam
     );
-  }, [pendingSubwayMoves, subwayTeams]);
+  }, [pendingSubwayMoves, subwayTeamPlayers, subwayTeams]);
 
   useEffect(() => {
     setSelectedPlayerId((current) =>
@@ -212,7 +213,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
         <section className="dealer-board-pane">
           <div className="dealer-pane-heading">
             <h2 className="brand-font">보드판</h2>
-            <span>{selectedSubway === BusType.BUS1 ? "1호선" : "2호선"} 위치를 확인하세요</span>
+            <span>단일 지하철 위치를 확인하세요</span>
           </div>
           <Board game={game} showFacing={false} showFacingFor={selectedSubway} />
         </section>
@@ -279,7 +280,7 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
                       >
                         <strong>{player.playerName ?? player.playerId}</strong>
                         <span style={{ display: "block", fontSize: "0.8rem", marginTop: 4 }}>
-                          {player.room === BusType.BUS1 ? "1번 버스방" : "2번 버스방"} · {player.roomIndex}번 {submitted ? "(제출 완료)" : ""}
+                          {player.roomIndex}번 제출자 {submitted ? "(제출 완료)" : ""}
                         </span>
                       </button>
                     );

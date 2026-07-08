@@ -9,12 +9,13 @@ import ScoreBoard from "@/components/ScoreBoard";
 import ActionLog from "@/components/ActionLog";
 import {
   adminAction,
+  adminGiveCards,
   adminSetTimers,
   adminUpdatePlayerName,
   usePhaseTimeLabel,
   usePublicGame,
 } from "@/lib/useGameState";
-import { COLOURS, MAX_PLAYERS, type Colour } from "@/lib/game";
+import { COLOURS, MAX_PLAYERS, type CardKind, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -40,6 +41,16 @@ const STATUS_LABELS = {
   GAME_OVER: "게임 종료",
 } as const;
 
+const CARD_LABELS: Record<CardKind, string> = {
+  STRAIGHT1: "1칸 직진",
+  STRAIGHT2: "2칸 직진",
+  STRAIGHT3: "3칸 직진",
+  LEFT: "좌회전",
+  RIGHT: "우회전",
+};
+
+const CARD_KINDS = Object.keys(CARD_LABELS) as CardKind[];
+
 export default function AdminPage({
   params,
 }: {
@@ -51,8 +62,12 @@ export default function AdminPage({
   const [editingPlayers, setEditingPlayers] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
   const [savingTimers, setSavingTimers] = useState(false);
+  const [givingCards, setGivingCards] = useState(false);
   const [timerDirty, setTimerDirty] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState("3");
+  const [cardPlayerId, setCardPlayerId] = useState("");
+  const [cardKind, setCardKind] = useState<CardKind>("STRAIGHT1");
+  const [cardCount, setCardCount] = useState("1");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
@@ -74,6 +89,16 @@ export default function AdminPage({
   const { status, game, participants, logs, activePlayerNames } = state;
   const subwayMoveTeams = state.subwayMoveTeams ?? [];
   const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
+  const playerOptions = game.players.length > 0
+    ? game.players
+    : participants
+        .filter((participant) => participant.colour)
+        .map((participant) => ({
+          id: participant.id,
+          name: participant.name,
+          team: participant.colour as Colour,
+          hand: [],
+        }));
   const canStartGame = participants.length > 0;
   const timerButtonLabel =
     status === "WAITING"
@@ -131,6 +156,32 @@ export default function AdminPage({
       await adminUpdatePlayerName(roomCode, playerId, name);
     } catch (error: any) {
       setErrorMsg(error.message || "이름 변경에 실패했습니다.");
+    }
+  };
+
+  const handleGiveCards = async (event: FormEvent) => {
+    event.preventDefault();
+    if (givingCards) return;
+    const targetPlayerId = cardPlayerId || playerOptions[0]?.id || "";
+    const count = Number(cardCount);
+    if (!targetPlayerId) {
+      setErrorMsg("카드를 지급할 플레이어를 선택하세요.");
+      return;
+    }
+    if (!Number.isFinite(count) || count < 1) {
+      setErrorMsg("카드 수량은 1장 이상으로 입력하세요.");
+      return;
+    }
+
+    setGivingCards(true);
+    setErrorMsg("");
+    try {
+      await adminGiveCards(roomCode, targetPlayerId, cardKind, Math.floor(count));
+      setCardCount("1");
+    } catch (error: any) {
+      setErrorMsg(error.message || "카드 지급에 실패했습니다.");
+    } finally {
+      setGivingCards(false);
     }
   };
 
@@ -281,15 +332,58 @@ export default function AdminPage({
               </p>
               {(status === "CHOOSING" || status === "ACTION_PHASE") && subwayMoveTeams.length > 0 && (
                 <div className="status-metadata" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {subwayMoveTeams.map((team) => (
-                    <span key={team} className="team-pill">
-                      <span className={`score-dot score-dot-${team}`} />
-                      {team} 지하철: {pendingSubwayMoves[team] ? "완료" : "대기"}
-                    </span>
-                  ))}
+                  {subwayMoveTeams.map((team) => {
+                    const teamPlayers = game.players.filter((player) => player.team === team);
+                    const submittedCount = teamPlayers.filter((player) => pendingSubwayMoves[player.id]).length;
+                    return (
+                      <span key={team} className="team-pill">
+                        <span className={`score-dot score-dot-${team}`} />
+                        {team} 지하철: {submittedCount}/{teamPlayers.length}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
+          )}
+
+          {status !== "LOBBY" && (
+            <form className="master-card-form" onSubmit={handleGiveCards}>
+              <h2 className="brand-font">추가 카드 지급</h2>
+              <select
+                value={cardPlayerId || playerOptions[0]?.id || ""}
+                onChange={(event) => setCardPlayerId(event.target.value)}
+                disabled={givingCards}
+              >
+                {playerOptions.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name || player.id} · {TEAM_LABELS[player.team]}
+                  </option>
+                ))}
+              </select>
+              <div className="master-card-grid">
+                <select
+                  value={cardKind}
+                  onChange={(event) => setCardKind(event.target.value as CardKind)}
+                  disabled={givingCards}
+                >
+                  {CARD_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>{CARD_LABELS[kind]}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={cardCount}
+                  onChange={(event) => setCardCount(event.target.value)}
+                  disabled={givingCards}
+                />
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={givingCards}>
+                {givingCards ? "지급 중" : "카드 지급"}
+              </button>
+            </form>
           )}
 
 

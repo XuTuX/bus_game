@@ -423,8 +423,18 @@ export function runMovePhase(
     
     let result: StepResult;
     if (action.subway) {
-      const busType = action.bus ?? BusType.BUS1;
-      result = stepSubway(game.subways[busType], card);
+      const busType = BusType.BUS1;
+      const subway = game.subways[busType];
+      if (!subway?.active) {
+        result = {
+          applied: false,
+          reason: "subway-inactive",
+          regions: [],
+          scoreGained: 0,
+        };
+      } else {
+        result = stepSubway(subway, card);
+      }
     } else {
       const busType = action.bus ?? BusType.BUS1;
       const bus = game.buses[busType];
@@ -500,6 +510,7 @@ export function runMovePhase(
 export function scoreSubwayTiles(game: GameState): void {
   const scoredColors = new Set<Colour>();
   for (const subway of Object.values(game.subways)) {
+    if (!subway.active) continue;
     for (const pos of subway.pos) {
       const tile = game.board[pos.y]?.[pos.x];
       if (tile && tile.colour) {
@@ -664,14 +675,7 @@ export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): 
         active: false,
       },
       [BusType.BUS2]: {
-        pos: [
-          { x: 5, y: 8 },
-          { x: 4, y: 8 },
-          { x: 3, y: 8 },
-          { x: 2, y: 8 },
-          { x: 1, y: 8 },
-          { x: 0, y: 8 },
-        ],
+        pos: [],
         facing: Facing.E,
         active: false,
       },
