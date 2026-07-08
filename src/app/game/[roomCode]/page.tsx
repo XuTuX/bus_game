@@ -2,7 +2,6 @@
 
 import { use } from "react";
 import Board from "@/components/Board";
-import BoardScorePopups from "@/components/BoardScorePopups";
 import SubwayMovePreview from "@/components/SubwayMovePreview";
 import { usePhaseTimeLabel, usePublicGame } from "@/lib/useGameState";
 import { BusType, COLOURS, getRoundColourOrder, type Colour, type GameState } from "@/lib/game";
@@ -42,14 +41,8 @@ export default function PublicBoardPage({
     );
   }
 
-  const { game, participants, logs, status } = state;
+  const { game, participants, status } = state;
   const subwayPreview = state.subwayPreview;
-  const latestTurnLog = logs[0];
-  const latestTurnLogs = latestTurnLog
-    ? logs
-        .filter((log) => log.round === latestTurnLog.round && log.turn === latestTurnLog.turn)
-        .reverse()
-    : [];
   const currentTeam = getRoundColourOrder(game.roundIndex)[game.turnIndex];
   const currentPlayers = game.players.filter((player) => player.team === currentTeam);
   const playerRooms = getCompactPlayerRooms(game, participants);
@@ -156,9 +149,6 @@ export default function PublicBoardPage({
         </div>
         <div className="board-result-wrapper">
           <Board game={game} subwayPreview={subwayPreview} />
-          {status === "RESULT_PHASE" && latestTurnLogs.length > 0 && (
-            <BoardScorePopups logs={latestTurnLogs} game={game} />
-          )}
         </div>
       </main>
 

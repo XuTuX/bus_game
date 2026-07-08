@@ -6,7 +6,6 @@ import Board from "@/components/Board";
 import PlayerRoomOrder from "@/components/PlayerRoomOrder";
 import RoomPageLinks from "@/components/RoomPageLinks";
 import ScoreBoard from "@/components/ScoreBoard";
-import TurnResultOverlay from "@/components/TurnResultOverlay";
 import {
   adminAction,
   adminGiveCards,
@@ -125,12 +124,6 @@ export default function AdminPage({
   }
 
   const { status, game, participants, activePlayerNames, logs } = state;
-  const latestTurnLog = logs?.[0];
-  const latestTurnLogs = latestTurnLog
-    ? (logs ?? [])
-        .filter((log) => log.round === latestTurnLog.round && log.turn === latestTurnLog.turn)
-        .reverse()
-    : [];
   const selectedPlayer = game.players.find((p) => p.id === selectedPlayerId);
   const playerOptions = game.players.length > 0
     ? game.players
@@ -309,9 +302,6 @@ export default function AdminPage({
             <span>버스의 머리 방향이 표시됩니다</span>
           </div>
           <Board game={game} showFacing={true} />
-          {status === "RESULT_PHASE" && latestTurnLogs.length > 0 && (
-            <TurnResultOverlay logs={latestTurnLogs} />
-          )}
         </section>
 
         <section className="dealer-panel admin-control-panel">
