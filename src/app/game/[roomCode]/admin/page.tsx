@@ -6,7 +6,6 @@ import Board from "@/components/Board";
 import PlayerRoomOrder from "@/components/PlayerRoomOrder";
 import RoomPageLinks from "@/components/RoomPageLinks";
 import ScoreBoard from "@/components/ScoreBoard";
-import ActionLog from "@/components/ActionLog";
 import {
   adminAction,
   adminGiveCards,
@@ -14,8 +13,9 @@ import {
   adminUpdatePlayerName,
   usePhaseTimeLabel,
   usePublicGame,
+  type PublicStateResult,
 } from "@/lib/useGameState";
-import { COLOURS, MAX_PLAYERS, type CardKind, type Colour } from "@/lib/game";
+import { COLOURS, MAX_PLAYERS, getRoundColourOrder, type CardKind, type Colour } from "@/lib/game";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -50,6 +50,8 @@ const CARD_LABELS: Record<CardKind, string> = {
 };
 
 const CARD_KINDS = Object.keys(CARD_LABELS) as CardKind[];
+
+type SubmissionState = "done" | "pending";
 
 export default function AdminPage({
   params,
@@ -86,9 +88,7 @@ export default function AdminPage({
     );
   }
 
-  const { status, game, participants, logs, activePlayerNames } = state;
-  const subwayMoveTeams = state.subwayMoveTeams ?? [];
-  const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
+  const { status, game, participants, activePlayerNames } = state;
   const playerOptions = game.players.length > 0
     ? game.players
     : participants
@@ -106,6 +106,13 @@ export default function AdminPage({
       : status === "CHOOSING" || status === "ACTION_PHASE"
         ? "타이머 시작"
         : "시간 저장";
+  const turnPhaseLabel =
+    status === "CHOOSING"
+      ? "이동 제출"
+      : status === "ACTION_PHASE"
+        ? "행동 제출"
+        : STATUS_LABELS[status];
+  const currentTeamLabel = state.busTeam ? `${TEAM_LABELS[state.busTeam]} 팀` : "-";
   const runAdminAction = async (
     action: "start_game" | "start"
   ) => {
@@ -262,7 +269,7 @@ export default function AdminPage({
             </div>
             <div className="admin-summary-current">
               <span>현재 차례</span>
-              <strong>{activePlayerNames || "-"}</strong>
+              <strong>{status === "CHOOSING" || status === "ACTION_PHASE" ? `${currentTeamLabel} · ${turnPhaseLabel}` : "-"}</strong>
             </div>
           </div>
 
@@ -323,28 +330,7 @@ export default function AdminPage({
           )}
 
           {(status === "CHOOSING" || status === "ACTION_PHASE") && (
-            <div className="master-waiting">
-              <h2 className="brand-font">
-                {status === "CHOOSING" ? "딜러룸 이동 입력 중" : "딜러룸 행동 입력 중"}
-              </h2>
-              <p>
-                {activePlayerNames} 님이 제출하면 바로 공개판에 반영됩니다.
-              </p>
-              {(status === "CHOOSING" || status === "ACTION_PHASE") && subwayMoveTeams.length > 0 && (
-                <div className="status-metadata" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {subwayMoveTeams.map((team) => {
-                    const teamPlayers = game.players.filter((player) => player.team === team);
-                    const submittedCount = teamPlayers.filter((player) => pendingSubwayMoves[player.id]).length;
-                    return (
-                      <span key={team} className="team-pill">
-                        <span className={`score-dot score-dot-${team}`} />
-                        {team} 지하철: {submittedCount}/{teamPlayers.length}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <MasterTurnStatus state={state} />
           )}
 
           {status !== "LOBBY" && (
@@ -418,13 +404,160 @@ export default function AdminPage({
           {status !== "LOBBY" && (
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>
               <hr style={{ border: "none", borderTop: "1px solid var(--border-light)" }} />
-              <ScoreBoard game={game} showBusStatus={true} />
-              <hr style={{ border: "none", borderTop: "1px solid var(--border-light)" }} />
-              <ActionLog logs={logs} />
+              <ScoreBoard game={game} showBusStatus={false} />
             </div>
           )}
         </section>
       </main>
     </div>
   );
+}
+
+function MasterTurnStatus({ state }: { state: PublicStateResult }) {
+  const { game, status } = state;
+  const currentTeam = state.busTeam ?? getRoundColourOrder(game.roundIndex)[game.turnIndex];
+  const busPlayers = game.players.filter((player) => player.team === currentTeam);
+  const bus1Player = busPlayers[0];
+  const bus2Player = busPlayers[1] ?? busPlayers[0];
+  const isMovePhase = status === "CHOOSING";
+  const phaseLabel = isMovePhase ? "이동 제출" : "행동 제출";
+  const busRows = [
+    {
+      key: "BUS1",
+      label: "1번 버스",
+      playerName: bus1Player?.name || bus1Player?.id || "-",
+      state: getBusSubmissionState(state, "BUS1"),
+    },
+    {
+      key: "BUS2",
+      label: "2번 버스",
+      playerName: bus2Player?.name || bus2Player?.id || "-",
+      state: getBusSubmissionState(state, "BUS2"),
+    },
+  ].filter((row, index, rows) => index === 0 || row.playerName !== rows[0].playerName || row.label !== rows[0].label);
+
+  return (
+    <div className="master-turn-card">
+      <div className="master-turn-header">
+        <div>
+          <span className="tiny-label">현재 차례</span>
+          <h2 className="brand-font">
+            <span className={`score-dot score-dot-${currentTeam}`} />
+            {TEAM_LABELS[currentTeam]} 팀
+          </h2>
+        </div>
+        <strong className="phase-chip">{phaseLabel}</strong>
+      </div>
+
+      <div className="submission-grid">
+        {busRows.map((row) => (
+          <SubmissionPill
+            key={row.key}
+            accentClass={row.key === "BUS1" ? "submission-pill-bus1" : "submission-pill-bus2"}
+            label={`${row.label} · ${row.playerName}`}
+            state={row.state}
+          />
+        ))}
+      </div>
+
+      <SubwaySubmissionStatus state={state} />
+    </div>
+  );
+}
+
+function SubwaySubmissionStatus({ state }: { state: PublicStateResult }) {
+  const subwayTeams = state.subwayMoveTeams ?? [];
+  const pendingSubwayMoves = state.pendingSubwayMoves ?? {};
+  const submissions = new Map(
+    (state.subwayPreview?.submissions ?? []).map((submission) => [
+      submission.playerId,
+      submission,
+    ])
+  );
+
+  if (subwayTeams.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="subway-status-card">
+      <div className="subway-status-heading">
+        <span className="tiny-label">지하철 제출</span>
+        <strong>
+          {state.subwayPreview?.submissions.length ?? 0}명 제출
+        </strong>
+      </div>
+      <div className="subway-team-status-list">
+        {subwayTeams.map((team) => {
+          const players =
+            state.subwayTeamPlayers?.[team] ??
+            state.game.players
+              .filter((player) => player.team === team)
+              .map((player) => ({
+                playerId: player.id,
+                playerName: player.name,
+                team,
+                roomIndex: 0,
+              }));
+          const submittedCount = players.filter((player) => pendingSubwayMoves[player.playerId]).length;
+
+          return (
+            <div className="subway-team-status" key={team}>
+              <div className="subway-team-title">
+                <span className={`score-dot score-dot-${team}`} />
+                <strong>{TEAM_LABELS[team]} 팀</strong>
+                <span>{submittedCount}/{players.length}</span>
+              </div>
+              <div className="subway-player-submissions">
+                {players.map((player) => {
+                  const submission = submissions.get(player.playerId);
+                  return (
+                    <span
+                      className={`subway-player-submission ${submission ? "subway-player-submission-done" : ""}`}
+                      key={player.playerId}
+                    >
+                      <strong>{player.playerName || player.playerId}</strong>
+                      <span>{submission?.label ?? "대기"}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SubmissionPill({
+  accentClass,
+  label,
+  state,
+}: {
+  accentClass: string;
+  label: string;
+  state: SubmissionState;
+}) {
+  return (
+    <div className={`submission-pill ${accentClass} ${state === "done" ? "submission-pill-done" : ""}`}>
+      <span>{label}</span>
+      <strong>{state === "done" ? "완료" : "대기"}</strong>
+    </div>
+  );
+}
+
+function getBusSubmissionState(
+  state: PublicStateResult,
+  bus: "BUS1" | "BUS2"
+): SubmissionState {
+  if (state.status === "CHOOSING") {
+    return state.pendingMoves?.[bus] ? "done" : "pending";
+  }
+
+  if (state.status === "ACTION_PHASE") {
+    return state.pendingActions?.[bus] ? "done" : "pending";
+  }
+
+  return "pending";
 }
