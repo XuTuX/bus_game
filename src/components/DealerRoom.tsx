@@ -256,7 +256,7 @@ export default function DealerRoom({
         ? BusType.BUS2
         : chosenBus);
   const displayGame =
-    animatedGame || dealerPreviewGame || submittedPreviewGame || game;
+    animatedGame || submittedPreviewGame || dealerPreviewGame || game;
   const activeBusPos = displayGame.buses[activeBusType].pos;
   const roomBusLabel = selectedBus === BusType.BUS1 ? "1번 버스" : "2번 버스";
   const roomTitle = roomBus ? `${roomBusLabel} 딜러룸` : "딜러룸";
@@ -288,7 +288,8 @@ export default function DealerRoom({
 
     try {
       // 1. Play step-by-step local movement animation in the Dealer Room
-      const animClone = JSON.parse(JSON.stringify(game)) as GameState;
+      const baseGame = dealerPreviewGame || game;
+      const animClone = JSON.parse(JSON.stringify(baseGame)) as GameState;
       setAnimatedGame(animClone);
 
       for (let i = 0; i < selectedMoves.length; i++) {
