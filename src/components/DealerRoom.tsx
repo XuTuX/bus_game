@@ -699,13 +699,10 @@ export default function DealerRoom({
                       <button
                         className="btn btn-primary"
                         onClick={handleMoveSubmit}
-                        disabled={submitting}
+                        disabled={submitting || selectedMoves.length === 0}
                         style={{ width: "100%" }}
                       >
-                        {submitting ? "버스 이동하는 중..." : selectedMoves.length === 0 ? "이동 없이 행동 단계로" : "이동 제출 & 행동 단계로"}
-                      </button>
-                      <button className="btn btn-ghost" onClick={handlePass} disabled={submitting} style={{ width: "100%" }}>
-                        이동 패스하기
+                        {submitting ? "버스 이동하는 중..." : "이동 제출 & 행동 단계로"}
                       </button>
                     </div>
                   </>
