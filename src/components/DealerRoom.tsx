@@ -54,20 +54,12 @@ const STATUS_TEXT = {
   LOBBY: "마스터가 사람을 입력하는 중입니다.",
   WAITING: "마스터가 딜러룸 입력을 시작할 때까지 대기하세요.",
   CHOOSING: "현재 차례입니다. 이동 옵션을 선택하고 제출하세요.",
-  ACTION_PHASE: "이동이 완료되었습니다. 행동(교환/장애물)을 선택하세요.",
+  ACTION_PHASE: "이동이 완료되었습니다. 행동(타일 위치 교환)을 선택하세요.",
   RESULT_PHASE: "이번 턴 결과 확인 중입니다. 마스터가 다음 턴을 시작할 때까지 대기하세요.",
   SUBMITTED: "제출 처리 중입니다.",
   REVEALED: "결과가 공개되었습니다.",
   GAME_OVER: "게임이 종료되었습니다.",
 } as const;
-
-type ObstacleEdgeTarget = {
-  from: Coord;
-  to: Coord;
-  orientation: "vertical" | "horizontal";
-  row: 0 | 1 | 2;
-  col: 0 | 1 | 2;
-};
 
 // Convert chosen kinds into server-compatible relative indices
 function getMovesWithIndices(
@@ -127,9 +119,8 @@ export default function DealerRoom({
   const [selectedMoves, setSelectedMoves] = useState<SelectedMove[]>([]);
 
   // Action phase states
-  const [selectedActionType, setSelectedActionType] = useState<"SWAP_TILE" | "PLACE_OBSTACLE" | null>(null);
+  const [selectedActionType, setSelectedActionType] = useState<"SWAP_TILE" | null>(null);
   const [actionTarget, setActionTarget] = useState<{ x: number; y: number } | null>(null);
-  const [obstacleTarget, setObstacleTarget] = useState<ObstacleEdgeTarget | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -178,11 +169,14 @@ export default function DealerRoom({
 
   useEffect(() => {
     setSelectedMoves([]);
-    setSelectedActionType(null);
     setActionTarget(null);
-    setObstacleTarget(null);
     setErrorMsg("");
     setAnimatedGame(null);
+    if (publicState?.status === "ACTION_PHASE") {
+      setSelectedActionType("SWAP_TILE");
+    } else {
+      setSelectedActionType(null);
+    }
     if (publicState?.status !== "CHOOSING") {
       setSubmittedPreviewGame(null);
     }
@@ -276,50 +270,7 @@ export default function DealerRoom({
     }
   }
 
-  const obstacleEdges: (ObstacleEdgeTarget & { disabled: boolean })[] = [];
-  if (status === "ACTION_PHASE") {
-    const existingWalls = Object.values(game.buses).flatMap((bus) => bus.walls);
-    for (let row = 0; row < 3; row += 1) {
-      for (let col = 0; col < 2; col += 1) {
-        const from = { x: activeBusPos.x + col - 1, y: activeBusPos.y + row - 1 };
-        const to = { x: from.x + 1, y: from.y };
-        const inBounds =
-          from.x >= 0 && from.x < game.board.length &&
-          to.x >= 0 && to.x < game.board.length &&
-          from.y >= 0 && from.y < game.board.length &&
-          to.y >= 0 && to.y < game.board.length;
-        const candidate = inBounds ? wallBetweenTiles(from, to) : null;
-        obstacleEdges.push({
-          from,
-          to,
-          orientation: "vertical",
-          row: row as 0 | 1 | 2,
-          col: col as 0 | 1 | 2,
-          disabled: !candidate || wallConflicts(candidate, existingWalls),
-        });
-      }
-    }
-    for (let row = 0; row < 2; row += 1) {
-      for (let col = 0; col < 3; col += 1) {
-        const from = { x: activeBusPos.x + col - 1, y: activeBusPos.y + row - 1 };
-        const to = { x: from.x, y: from.y + 1 };
-        const inBounds =
-          from.x >= 0 && from.x < game.board.length &&
-          to.x >= 0 && to.x < game.board.length &&
-          from.y >= 0 && from.y < game.board.length &&
-          to.y >= 0 && to.y < game.board.length;
-        const candidate = inBounds ? wallBetweenTiles(from, to) : null;
-        obstacleEdges.push({
-          from,
-          to,
-          orientation: "horizontal",
-          row: row as 0 | 1 | 2,
-          col: col as 0 | 1 | 2,
-          disabled: !candidate || wallConflicts(candidate, existingWalls),
-        });
-      }
-    }
-  }
+
 
   // Handle Movement submission (transitions status to ACTION_PHASE)
   const handleMoveSubmit = async () => {
@@ -388,26 +339,17 @@ export default function DealerRoom({
   const handleActionSubmit = async () => {
     if (!resolvedPlayerId || status !== "ACTION_PHASE" || !selectedActionType || !canAct) return;
     if (selectedActionType === "SWAP_TILE" && !actionTarget) return;
-    if (selectedActionType === "PLACE_OBSTACLE" && !obstacleTarget) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
-      const action = selectedActionType === "SWAP_TILE"
-        ? ({
-            type: selectedActionType,
-            bus: activeBusType,
-            target: actionTarget,
-          } as TurnAction)
-        : ({
-            type: selectedActionType,
-            bus: activeBusType,
-            from: obstacleTarget?.from,
-            to: obstacleTarget?.to,
-          } as TurnAction);
+      const action = {
+        type: selectedActionType,
+        bus: activeBusType,
+        target: actionTarget,
+      } as TurnAction;
       await submitAction(roomCode, resolvedPlayerId, [action], activeBusType);
       setSelectedActionType(null);
       setActionTarget(null);
-      setObstacleTarget(null);
     } catch (e: any) {
       setErrorMsg(e.message || "행동 제출에 실패했습니다.");
     } finally {
@@ -424,7 +366,6 @@ export default function DealerRoom({
       await submitAction(roomCode, resolvedPlayerId, [], activeBusType);
       setSelectedActionType(null);
       setActionTarget(null);
-      setObstacleTarget(null);
     } catch (e: any) {
       setErrorMsg(e.message || "행동 패스에 실패했습니다.");
     } finally {
@@ -726,125 +667,38 @@ export default function DealerRoom({
                       {activeBusPos.x}, {activeBusPos.y}) 기준 주변 9칸 행동을 진행합니다.
                     </p>
 
-                    <div className="tile-action-options" style={{ marginBottom: 20 }}>
-                      <button
-                        type="button"
-                        className={`tile-action-btn ${selectedActionType === "SWAP_TILE" ? "tile-action-btn-active" : ""}`}
-                        onClick={() => {
-                          setSelectedActionType("SWAP_TILE");
-                          setActionTarget(null);
-                          setObstacleTarget(null);
-                        }}
-                      >
-                        타일 위치 교환
-                      </button>
-                      <button
-                        type="button"
-                        className={`tile-action-btn ${selectedActionType === "PLACE_OBSTACLE" ? "tile-action-btn-active" : ""}`}
-                        onClick={() => {
-                          setSelectedActionType("PLACE_OBSTACLE");
-                          setActionTarget(null);
-                          setObstacleTarget(null);
-                        }}
-                      >
-                        장애물 설치
-                      </button>
+                    <div className="action-phase-section" style={{ marginTop: 12 }}>
+                      <p className="dealer-subtitle" style={{ textAlign: "center", marginBottom: 16 }}>
+                        아래 9칸 중 한 칸을 클릭하면 현재 버스 타일과 선택한 타일의 위치가 서로 바뀝니다.
+                      </p>
+
+                      <div className="action-grid-3x3">
+                        {gridCells.map(({ dx, dy, tx, ty, tile, inBounds }, index) => {
+                          const isCenter = dx === 0 && dy === 0;
+                          const isSelected = actionTarget?.x === tx && actionTarget?.y === ty;
+
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              disabled={!inBounds}
+                              className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
+                                isSelected ? "selected" : ""
+                              } ${!inBounds ? "disabled" : ""}`}
+                              onClick={() => {
+                                setActionTarget({ x: tx, y: ty });
+                              }}
+                            >
+                              {isCenter && (
+                                <span className="bus-cell-label">
+                                  {activeBusType === BusType.BUS1 ? "1번 버스" : "2번 버스"}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-
-                    {selectedActionType ? (
-                      <div className="action-phase-section">
-                        <p className="dealer-subtitle" style={{ textAlign: "center" }}>
-                          {selectedActionType === "SWAP_TILE"
-                            ? "아래 9칸 중 한 칸을 클릭하면 현재 버스 타일과 선택한 타일의 위치가 서로 바뀝니다."
-                            : "버스 주변 3x3 안의 내부 경계 12개 중 하나를 선택하여 장애물을 설치하세요."}
-                        </p>
-
-                        {selectedActionType === "SWAP_TILE" ? (
-                          <div className="action-grid-3x3">
-                            {gridCells.map(({ dx, dy, tx, ty, tile, inBounds }, index) => {
-                              const isCenter = dx === 0 && dy === 0;
-                              const isSelected = actionTarget?.x === tx && actionTarget?.y === ty;
-
-                              return (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  disabled={!inBounds}
-                                  className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
-                                    isSelected ? "selected" : ""
-                                  } ${!inBounds ? "disabled" : ""}`}
-                                  onClick={() => {
-                                    setActionTarget({ x: tx, y: ty });
-                                  }}
-                                >
-                                  {isCenter && (
-                                    <span className="bus-cell-label">
-                                      {activeBusType === BusType.BUS1 ? "1번 버스" : "2번 버스"}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="obstacle-edge-picker">
-                            <div className="action-grid-3x3 obstacle-edge-grid">
-                              {gridCells.map(({ dx, dy, tile, inBounds }, index) => {
-                                const isCenter = dx === 0 && dy === 0;
-                                return (
-                                  <div
-                                    key={index}
-                                    className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
-                                      !inBounds ? "disabled" : ""
-                                    }`}
-                                  >
-                                    {isCenter && (
-                                      <span className="bus-cell-label">
-                                        {activeBusType === BusType.BUS1 ? "1번 버스" : "2번 버스"}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {obstacleEdges.map((edge, index) => {
-                              const isSelected =
-                                obstacleTarget?.from.x === edge.from.x &&
-                                obstacleTarget?.from.y === edge.from.y &&
-                                obstacleTarget?.to.x === edge.to.x &&
-                                obstacleTarget?.to.y === edge.to.y;
-                              return (
-                                <button
-                                  key={`${edge.orientation}-${edge.row}-${edge.col}-${index}`}
-                                  type="button"
-                                  disabled={edge.disabled}
-                                  className={`obstacle-edge-button obstacle-edge-${edge.orientation} ${
-                                    isSelected ? "obstacle-edge-selected" : ""
-                                  } ${edge.disabled ? "obstacle-edge-disabled" : ""}`}
-                                  style={
-                                    edge.orientation === "vertical"
-                                      ? {
-                                          left: `${((edge.col + 1) / 3) * 100}%`,
-                                          top: `${((edge.row + 0.5) / 3) * 100}%`,
-                                        }
-                                      : {
-                                          left: `${((edge.col + 0.5) / 3) * 100}%`,
-                                          top: `${((edge.row + 1) / 3) * 100}%`,
-                                        }
-                                  }
-                                  onClick={() => setObstacleTarget(edge)}
-                                  aria-label="장애물 경계 선택"
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text-secondary)" }}>
-                        행동 유형(타일 위치 교환 또는 장애물 설치)을 선택하세요
-                      </div>
-                    )}
 
                     <div className="dealer-submit-row" style={{ marginTop: 24 }}>
                       <button
@@ -853,8 +707,7 @@ export default function DealerRoom({
                         disabled={
                           submitting ||
                           !selectedActionType ||
-                          (selectedActionType === "SWAP_TILE" && !actionTarget) ||
-                          (selectedActionType === "PLACE_OBSTACLE" && !obstacleTarget)
+                          (selectedActionType === "SWAP_TILE" && !actionTarget)
                         }
                         style={{ flex: 2 }}
                       >

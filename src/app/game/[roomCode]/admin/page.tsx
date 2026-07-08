@@ -318,7 +318,7 @@ export default function AdminPage({
           <div className="admin-summary">
             <div>
               <span>라운드</span>
-              <strong>{Math.min(game.roundIndex + 1, 5)} / 5</strong>
+              <strong>{Math.min(game.roundIndex + 1, 8)} / 8</strong>
             </div>
             <div>
               <span>상태</span>

@@ -81,7 +81,7 @@ export interface GameState {
   obstacles: Coord[];
 }
 
-export type TurnActionKind = "MOVE" | "SWAP_TILE" | "PLACE_OBSTACLE";
+export type TurnActionKind = "MOVE" | "SWAP_TILE";
 
 export interface MoveTurnAction {
   type?: "MOVE";
@@ -96,15 +96,7 @@ export interface SwapTileTurnAction {
   target: Coord;
 }
 
-export interface PlaceObstacleTurnAction {
-  type: "PLACE_OBSTACLE";
-  bus: BusType;
-  target?: Coord;
-  from?: Coord;
-  to?: Coord;
-}
-
-export type TurnAction = MoveTurnAction | SwapTileTurnAction | PlaceObstacleTurnAction;
+export type TurnAction = MoveTurnAction | SwapTileTurnAction;
 
 export interface StepResult {
   applied: boolean;
@@ -126,8 +118,25 @@ export const COLOURS = [
 ] as const;
 
 export function getRoundColourOrder(roundIndex: number): Colour[] {
-  const offset = roundIndex % COLOURS.length;
-  return [...COLOURS.slice(offset), ...COLOURS.slice(0, offset)];
+  const orders: Colour[][] = [
+    // 1R (index 0): 노랑, 보라(퍼플), 파랑, 빨강, 초록
+    [Colour.Yellow, Colour.Purple, Colour.Blue, Colour.Red, Colour.Green],
+    // 2R (index 1): 빨강, 노랑, 초록, 파랑, 보라(퍼플)
+    [Colour.Red, Colour.Yellow, Colour.Green, Colour.Blue, Colour.Purple],
+    // 3R (index 2): 노랑, 파랑, 초록, 빨강, 보라(퍼플)
+    [Colour.Yellow, Colour.Blue, Colour.Green, Colour.Red, Colour.Purple],
+    // 4R (index 3): 초록, 노랑, 보라(퍼플), 빨강, 파랑
+    [Colour.Green, Colour.Yellow, Colour.Purple, Colour.Red, Colour.Blue],
+    // 5R (index 4): 초록, 보라(퍼플), 파랑, 노랑, 빨강
+    [Colour.Green, Colour.Purple, Colour.Blue, Colour.Yellow, Colour.Red],
+    // 6R (index 5): 빨강, 보라(퍼플), 초록, 파랑, 노랑
+    [Colour.Red, Colour.Purple, Colour.Green, Colour.Blue, Colour.Yellow],
+    // 7R (index 6): 파랑, 빨강, 초록, 보라(퍼플), 노랑
+    [Colour.Blue, Colour.Red, Colour.Green, Colour.Purple, Colour.Yellow],
+    // 8R (index 7): 보라(퍼플), 파랑, 빨강, 노랑, 초록
+    [Colour.Purple, Colour.Blue, Colour.Red, Colour.Yellow, Colour.Green],
+  ];
+  return orders[roundIndex % orders.length];
 }
 
 export const MAX_PLAYERS_PER_COLOUR = 2;
@@ -364,24 +373,21 @@ export function scoreRegion(region: Region, game: GameState): void {
 }
 
 export function generateBoard(rng: Rng = Math.random): Tile[][] {
-  for (let attempt = 0; attempt < 5000; attempt += 1) {
-    const extraColour = COLOURS[Math.floor(rng() * COLOURS.length)];
-    const remaining = new Map<Colour, number>();
-    for (const colour of COLOURS) {
-      remaining.set(colour, colour === extraColour ? 17 : 16);
-    }
-
-    const cells: Colour[] = [];
-    if (fillBoardColours(cells, remaining, rng)) {
-      const board = toBoard(cells);
-      board[4][4].colour = null; // Center is gray
-      if (boardMeetsGlobalRules(board)) {
-        return board;
+  const board: Tile[][] = [];
+  let seqIndex = 0;
+  for (let y = 0; y < BOARD_SIZE; y += 1) {
+    const row: Tile[] = [];
+    for (let x = 0; x < BOARD_SIZE; x += 1) {
+      if (y === 4 && x === 4) {
+        row.push({ colour: null });
+      } else {
+        row.push({ colour: COLOURS[seqIndex % COLOURS.length] });
+        seqIndex += 1;
       }
     }
+    board.push(row);
   }
-
-  throw new Error("Unable to generate a valid board after 5000 attempts");
+  return board;
 }
 
 export function dealHand(rng: Rng = Math.random): Card[] {
@@ -530,7 +536,7 @@ export function scoreMatchingBusDestinationBonus(
 
 export function runActionPhase(
   player: Player,
-  action: SwapTileTurnAction | PlaceObstacleTurnAction | null,
+  action: SwapTileTurnAction | null,
   game: GameState
 ): StepResult {
   if (isGameOver(game)) {
@@ -563,64 +569,6 @@ export function runActionPhase(
         game.swappedTiles.push([busPos, action.target]);
         result = { applied: true, regions: [] };
       }
-    } else if (action.type === "PLACE_OBSTACLE") {
-      if (action.from && action.to) {
-        const fromTile = game.board[action.from.y]?.[action.from.x];
-        const toTile = game.board[action.to.y]?.[action.to.x];
-        if (!fromTile || !toTile) {
-          return { applied: false, reason: "invalid-target", regions: [] };
-        }
-
-        const edgeDx = Math.abs(action.from.x - action.to.x);
-        const edgeDy = Math.abs(action.from.y - action.to.y);
-        if (edgeDx + edgeDy !== 1) {
-          return { applied: false, reason: "target-not-adjacent", regions: [] };
-        }
-
-        const fromBusDx = Math.abs(action.from.x - busPos.x);
-        const fromBusDy = Math.abs(action.from.y - busPos.y);
-        const toBusDx = Math.abs(action.to.x - busPos.x);
-        const toBusDy = Math.abs(action.to.y - busPos.y);
-        if (fromBusDx > 1 || fromBusDy > 1 || toBusDx > 1 || toBusDy > 1) {
-          return { applied: false, reason: "target-out-of-range", regions: [] };
-        }
-
-        const candidate = wallBetweenTiles(action.from, action.to);
-        const existingWalls = Object.values(game.buses).flatMap((state) => state.walls);
-        if (wallConflicts(candidate, existingWalls)) {
-          return { applied: false, reason: "obstacle-conflict", regions: [] };
-        }
-
-        bus.walls.push({ ...candidate, bus: action.bus });
-        return { applied: true, regions: [] };
-      }
-
-      if (!action.target) {
-        return { applied: false, reason: "invalid-target", regions: [] };
-      }
-
-      const target = action.target;
-      const dx = Math.abs(target.x - busPos.x);
-      const dy = Math.abs(target.y - busPos.y);
-      const targetTile = game.board[target.y]?.[target.x];
-      if (!targetTile) {
-        return { applied: false, reason: "invalid-target", regions: [] };
-      }
-
-      if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
-        return { applied: false, reason: "target-not-straight-line", regions: [] };
-      }
-      if (dx > 3 || dy > 3) {
-        return { applied: false, reason: "target-out-of-range", regions: [] };
-      }
-
-      const isObstacleExist = game.obstacles.some(o => o.x === target.x && o.y === target.y);
-      if (isObstacleExist) {
-        return { applied: false, reason: "obstacle-conflict", regions: [] };
-      }
-
-      game.obstacles.push(target);
-      result = { applied: true, regions: [] };
     }
   }
 
@@ -644,7 +592,7 @@ export function nextRound(game: GameState): void {
 }
 
 export function isGameOver(game: GameState): boolean {
-  return game.roundIndex >= 5;
+  return game.roundIndex >= 8;
 }
 
 export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): GameState {

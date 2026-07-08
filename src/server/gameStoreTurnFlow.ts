@@ -538,14 +538,11 @@ function actionLabel(action: TurnAction, currentHand: Card[]): string {
   if (action.type === "SWAP_TILE") {
     return "타일 위치 교환";
   }
-  if (action.type === "PLACE_OBSTACLE") {
-    return "장애물 설치";
-  }
 
   const card = currentHand[(action as MoveTurnAction).cardIndex];
   return card ? cardLabel(card) : "이동";
 }
 
 function actionPhaseLabel(action: ActionPhaseTurnAction): string {
-  return action.type === "SWAP_TILE" ? "타일 위치 교환" : "장애물 설치";
+  return "타일 위치 교환";
 }

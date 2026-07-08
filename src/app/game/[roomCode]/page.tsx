@@ -62,7 +62,7 @@ export default function PublicBoardPage({
       <aside className="public-sidebar">
         <section className="public-compact-card">
           <h2 className="brand-font">현재 라운드</h2>
-          <div className="public-round-value">{Math.min(game.roundIndex + 1, 5)} / 5</div>
+          <div className="public-round-value">{Math.min(game.roundIndex + 1, 8)} / 8</div>
           <div className="public-status">{STATUS_LABELS[status]}</div>
           <div className="public-meta-lines">
             <span>남은 시간 {phaseTimeLabel || "0:00"}</span>

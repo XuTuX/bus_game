@@ -4,11 +4,10 @@ import {
   Colour,
   type GameState,
   type MoveTurnAction,
-  type PlaceObstacleTurnAction,
   type SwapTileTurnAction,
 } from "@/lib/game";
 
-export type ActionPhaseTurnAction = SwapTileTurnAction | PlaceObstacleTurnAction;
+export type ActionPhaseTurnAction = SwapTileTurnAction;
 
 export interface SubwayMoveSubmission {
   playerId: string;
