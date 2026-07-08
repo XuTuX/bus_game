@@ -11,7 +11,37 @@ interface AnimatedAction {
   applied: boolean;
   reason?: string;
   bus: BusType;
-  category: "bus1-move" | "bus2-move" | "bus1-action" | "bus2-action" | "subway" | "score";
+  category: "bus1-move" | "bus2-move" | "bus1-action" | "bus2-action" | "score";
+}
+
+const COLOR_MAP: Record<string, string> = {
+  "레드": "var(--team-red, #ff4757)",
+  "퍼플": "var(--team-purple, #9b59b6)",
+  "옐로": "var(--team-yellow, #f1c40f)",
+  "그린": "var(--team-green, #2ecc71)",
+  "블루": "var(--team-blue, #3498db)",
+  "버스 1": "var(--bus1-color, #00cec9)",
+  "버스 2": "var(--bus2-color, #fdcb6e)",
+};
+
+function ColorizedLabel({ text }: { text: string }) {
+  const regex = /(레드|퍼플|옐로|그린|블루|버스 1|버스 2)/g;
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const color = COLOR_MAP[part];
+        if (color) {
+          return (
+            <span key={i} style={{ color, fontWeight: "bold" }}>
+              {part}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
@@ -118,19 +148,7 @@ export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
       });
     });
 
-  // 지하철
-  actionPhaseActions
-    .filter((a) => a.actionLabel.startsWith("지하철"))
-    .forEach((a) => {
-      allAnimated.push({
-        id: idCounter++,
-        label: `🚇 ${a.actionLabel}`,
-        score: a.scoreGained,
-        applied: a.applied,
-        bus: a.bus,
-        category: "subway",
-      });
-    });
+
 
   // 점수 판정
   actionPhaseActions
@@ -189,7 +207,9 @@ export default function TurnResultOverlay({ logs }: { logs: LogEntry[] }) {
                 item.category
               }`}
             >
-              <span className="turn-result-feed-label">{item.label}</span>
+              <span className="turn-result-feed-label">
+                <ColorizedLabel text={item.label} />
+              </span>
               <span className="turn-result-feed-status">
                 {item.applied ? (
                   item.score !== 0 ? (

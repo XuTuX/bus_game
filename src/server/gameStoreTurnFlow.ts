@@ -417,23 +417,10 @@ function appendSubwayLogAction(
   const teamPrefix = player ? `${TEAM_NAMES_KO[player.team] || player.team} ` : "";
 
   if (!submission.action) {
-    actionDetails.push({
-      actionLabel: `${teamPrefix}${subwayLabel} 패스`,
-      bus: BusType.BUS1,
-      applied: true,
-      scoreGained: 0,
-    });
     return false;
   }
 
   if (!player) {
-    actionDetails.push({
-      actionLabel: `${teamPrefix}${subwayLabel} 이동`,
-      bus: BusType.BUS1,
-      applied: false,
-      reason: "제출 플레이어를 찾을 수 없습니다.",
-      scoreGained: 0,
-    });
     return false;
   }
 
@@ -443,13 +430,6 @@ function appendSubwayLogAction(
       : player.hand.findIndex((card) => card.kind === submission.cardKind);
 
   if (cardIndex < 0) {
-    actionDetails.push({
-      actionLabel: `${teamPrefix}${subwayLabel} 이동`,
-      bus: BusType.BUS1,
-      applied: false,
-      reason: "제출한 이동 카드가 손패에 남아있지 않습니다.",
-      scoreGained: 0,
-    });
     return false;
   }
 
@@ -463,13 +443,6 @@ function appendSubwayLogAction(
     scoreSubwaysAtEnd: false,
   });
 
-  actionDetails.push({
-    actionLabel: `지하철 ${subwayCardLabel(submission.cardKind)}`,
-    bus: BusType.BUS1,
-    applied: result.applied,
-    reason: result.reason,
-    scoreGained: 0,
-  });
   return result.applied;
 }
 
