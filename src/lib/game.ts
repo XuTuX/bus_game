@@ -210,14 +210,14 @@ export function step(
     // 1. Check off-board
     if (next.x < 0 || next.x >= game.board.length || next.y < 0 || next.y >= game.board.length) {
       collisionOccurred = true;
-      logs.push(`${busType}이(가) 보드 밖으로 벗어나려다 충돌했습니다. -2점`);
+      logs.push(`${busType}이(가) 보드 밖으로 벗어나려다 충돌했습니다.`);
       break;
     }
 
     // 2. Check center gray cell collision
     if (game.centerRulesActive && next.x === 4 && next.y === 4) {
       collisionOccurred = true;
-      logs.push(`중앙 회색 구역은 이제 막힌 구역입니다. ${busType} 충돌! -2점`);
+      logs.push(`중앙 회색 구역은 이제 막힌 구역입니다. ${busType} 충돌!`);
       break;
     }
 
@@ -226,7 +226,7 @@ export function step(
     const otherBus = game.buses[otherBusType];
     if (coordsEqual(otherBus.pos, next)) {
       collisionOccurred = true;
-      logs.push(`${busType}이(가) ${otherBusType}와(과) 충돌했습니다. -2점`);
+      logs.push(`${busType}이(가) ${otherBusType}와(과) 충돌했습니다.`);
       break;
     }
 
@@ -235,7 +235,7 @@ export function step(
     const hitWall = existing.find(w => wallConflicts(segment, [w]));
     if (hitWall) {
       collisionOccurred = true;
-      logs.push(`${busType}이(가) 벽에 충돌했습니다. -2점`);
+      logs.push(`${busType}이(가) 벽에 충돌했습니다.`);
       break;
     }
 
@@ -243,7 +243,7 @@ export function step(
     const hitObstacleIdx = game.obstacles.findIndex(o => coordsEqual(o, next));
     if (hitObstacleIdx !== -1) {
       collisionOccurred = true;
-      logs.push(`${busType}이(가) 장애물에 충돌했습니다. -2점`);
+      logs.push(`${busType}이(가) 장애물에 충돌했습니다.`);
       game.obstacles.splice(hitObstacleIdx, 1);
       break;
     }
@@ -452,7 +452,7 @@ export function runMovePhase(
 
       // Handle collision penalty
       if (result.collisionPenalty) {
-        game.teamScores[player.team] -= 2;
+        // game.teamScores[player.team] -= 2; // Removed according to new rules
       }
 
       // Handle path scoring and arrivals
@@ -469,18 +469,7 @@ export function runMovePhase(
         }
         result.scoreGained = gained;
       }
-
-      // Distance Penalty
-      const b1 = game.buses[BusType.BUS1].pos;
-      const b2 = game.buses[BusType.BUS2].pos;
-      const dist = Math.abs(b1.x - b2.x) + Math.abs(b1.y - b2.y);
-      if (dist === 1 || dist === 2) {
-        const penalty = dist === 1 ? 5 : 2;
-        game.teamScores[player.team] -= penalty;
-        if (result.logs) {
-          result.logs.push(`버스 간 거리가 ${dist}칸입니다. ${player.team}팀 -${penalty}점`);
-        }
-      }
+      // Distance Penalty moved to end of turn
     }
     
     // Add logs to global game logs
@@ -503,7 +492,8 @@ export function scoreSubwayTiles(game: GameState): void {
   const scoredColors = new Set<Colour>();
   for (const subway of Object.values(game.subways)) {
     if (!subway.active) continue;
-    for (const pos of subway.pos) {
+    const pos = subway.pos[0];
+    if (pos) {
       const tile = game.board[pos.y]?.[pos.x];
       if (tile && tile.colour) {
         scoredColors.add(tile.colour);
@@ -512,7 +502,7 @@ export function scoreSubwayTiles(game: GameState): void {
   }
   for (const colour of scoredColors) {
     game.teamScores[colour] += 1;
-    game.logs.push(`지하철이 ${colour} 칸을 지나갔습니다. +1점`);
+    game.logs.push(`지하철이 ${colour} 칸에 정차했습니다. +1점`);
   }
 }
 
@@ -531,10 +521,10 @@ export function scoreMatchingBusDestinationBonus(
 
   const uniqueTeams = [...new Set(recipientTeams)];
   for (const team of uniqueTeams) {
-    game.teamScores[team] += 2;
+    game.teamScores[team] += 3;
   }
   game.logs.push(
-    `두 버스가 모두 ${bus1Colour} 칸에 도착했습니다. 현재 조작 팀 ${uniqueTeams.join(", ")} +2점`
+    `두 버스가 모두 ${bus1Colour} 칸에 도착했습니다. 현재 조작 팀 ${uniqueTeams.join(", ")} +3점`
   );
 }
 

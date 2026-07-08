@@ -320,6 +320,21 @@ export function finalizeTurnResult(room: RoomState) {
     clone.teamScores,
     "지하철 통과 색상 점수"
   );
+
+  const beforeDistanceScores = { ...clone.teamScores };
+  const finalDist = Math.abs(clone.buses.BUS1.pos.x - clone.buses.BUS2.pos.x) + Math.abs(clone.buses.BUS1.pos.y - clone.buses.BUS2.pos.y);
+  if (finalDist === 1 || finalDist === 2) {
+    const penalty = finalDist === 1 ? 5 : 2;
+    if (bus1Player) clone.teamScores[bus1Player.team] -= penalty;
+    if (bus2Player) clone.teamScores[bus2Player.team] -= penalty;
+  }
+  appendScoreDeltaLogActions(
+    actionDetails,
+    beforeDistanceScores,
+    clone.teamScores,
+    `버스 간 거리 ${finalDist}칸 감점`
+  );
+
   addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1, "ACTION");
 
   room.game = clone;
@@ -515,7 +530,7 @@ function scoreCurrentBusRegions(game: GameState) {
   const bus2Size = getConnectedComponentSize(bus2State.pos, game.board, allWalls);
   const bus2Color = game.board[bus2State.pos.y]?.[bus2State.pos.x]?.colour;
   if (bus2Color) {
-    game.teamScores[bus2Color] -= bus2Size;
+    game.teamScores[bus2Color] += bus2Size;
   }
 }
 
