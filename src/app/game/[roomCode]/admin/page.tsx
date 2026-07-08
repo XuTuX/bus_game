@@ -17,6 +17,7 @@ import {
   type PublicStateResult,
 } from "@/lib/useGameState";
 import { COLOURS, MAX_PLAYERS, getRoundColourOrder, type CardKind, type Colour, type Card } from "@/lib/game";
+import { type LogEntry } from "@/server/gameStore";
 
 const TEAM_COLOUR_VARS: Record<Colour, string> = {
   Red: "var(--team-red)",
@@ -469,6 +470,8 @@ export default function AdminPage({
             </div>
           )}
         </section>
+
+        <TurnHistoryLog logs={logs ?? []} />
       </main>
 
       {selectedPlayer && (
@@ -661,4 +664,56 @@ function getBusSubmissionState(
   }
 
   return "pending";
+}
+
+function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
+  if (!logs || logs.length === 0) return null;
+
+  // Group logs by Round and Turn
+  const groupedLogs = logs.reduce((acc, log) => {
+    const key = `R${log.round} T${log.turn}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(log);
+    return acc;
+  }, {} as Record<string, LogEntry[]>);
+
+  return (
+    <section className="dealer-panel turn-history-panel">
+      <div className="panel-title-row">
+        <h2 className="brand-font">이전 턴 점수 기록</h2>
+      </div>
+      <div className="turn-history-feed" style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, paddingRight: 4 }}>
+        {Object.entries(groupedLogs).map(([key, groupLogs]) => {
+          const allActions = groupLogs.flatMap(l => l.actions);
+          const scoreActions = allActions.filter(a => a.scoreGained !== 0);
+          
+          if (scoreActions.length === 0) return null;
+          
+          return (
+            <div key={key} className="turn-history-group" style={{ background: "rgba(20, 20, 35, 0.5)", padding: 12, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.6)", marginBottom: 8, fontWeight: "bold" }}>{key}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {scoreActions.map((action, idx) => {
+                  const [label, teamStr] = action.actionLabel.split(": ");
+                  const teamLabel = teamStr && TEAM_LABELS[teamStr as Colour] ? `${TEAM_LABELS[teamStr as Colour]}팀` : "";
+                  
+                  return (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", alignItems: "center" }}>
+                      <span>
+                        {teamLabel && <strong style={{ color: TEAM_COLOUR_VARS[teamStr as Colour], marginRight: 6 }}>{teamLabel}</strong>}
+                        {teamLabel ? label : action.actionLabel}
+                      </span>
+                      <strong style={{ color: action.scoreGained > 0 ? "var(--team-green)" : "var(--team-red)" }}>
+                        {action.scoreGained > 0 ? "+" : ""}{action.scoreGained}점
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
