@@ -325,12 +325,24 @@ export default function SubwayRoom({ roomCode }: { roomCode: string }) {
             {!canSubwaySubmitPhase ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">{STATUS_TEXT[publicState.status] ?? "대기 중"}</h3>
-                <p>이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다.</p>
+                <p>
+                  {publicState.status === "ACTION_PHASE" &&
+                  publicState.pendingActions?.BUS1 &&
+                  publicState.pendingActions?.BUS2
+                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    : "이동 단계가 시작되면 행동 단계가 끝나기 전까지 지하철 카드를 제출할 수 있습니다."}
+                </p>
               </div>
             ) : isSelectedPlayerSubmitted ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">제출 완료</h3>
-                <p>선택하신 플레이어의 지하철 입력이 이미 접수되었습니다.</p>
+                <p>
+                  {publicState.status === "ACTION_PHASE" &&
+                  publicState.pendingActions?.BUS1 &&
+                  publicState.pendingActions?.BUS2
+                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    : "선택하신 플레이어의 지하철 입력이 이미 접수되었습니다."}
+                </p>
               </div>
             ) : (
               <>

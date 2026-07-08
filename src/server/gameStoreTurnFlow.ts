@@ -262,8 +262,18 @@ export function finalizeTurnResult(room: RoomState) {
 
   const subwayTeams = getSubwayMoveTeams(room.game);
   const subwayPlayers = room.game.players.filter((p) => subwayTeams.includes(p.team));
-  if (subwayPlayers.some((p) => !room.pendingSubwayMoves[p.id])) {
-    throw new Error("아직 지하철 제출이 끝나지 않았습니다.");
+  for (const p of subwayPlayers) {
+    if (!room.pendingSubwayMoves[p.id]) {
+      room.pendingSubwayMoves[p.id] = {
+        playerId: p.id,
+        playerName: p.name,
+        team: p.team,
+        subway: BusType.BUS1,
+        action: null,
+        cardKind: undefined,
+        submittedOrder: 999,
+      };
+    }
   }
 
   const clone = deepClone(room.game);

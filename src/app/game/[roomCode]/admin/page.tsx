@@ -141,8 +141,7 @@ export default function AdminPage({
   const canEndTurn =
     status === "ACTION_PHASE" &&
     !!state.pendingActions?.BUS1 &&
-    !!state.pendingActions?.BUS2 &&
-    areSubwaysSubmitted;
+    !!state.pendingActions?.BUS2;
   const timerButtonLabel =
     status === "RESULT_PHASE"
       ? "다음 턴 시작"

@@ -530,7 +530,11 @@ export default function DealerRoom({
             ) : status === "ACTION_PHASE" && hasISubmittedAction ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font" style={{ color: "var(--bus2-color)" }}>행동 제출 완료!</h3>
-                <p style={{ marginTop: 8 }}>상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다...</p>
+                <p style={{ marginTop: 8 }}>
+                  {isBus1ActionSubmitted && isBus2ActionSubmitted
+                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    : "상대방 플레이어의 행동(교환/장애물) 제출을 기다리고 있습니다..."}
+                </p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                   <span>1번 버스 행동 제출: {isBus1ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
                   <span>2번 버스 행동 제출: {isBus2ActionSubmitted ? "✅ 완료" : "⏳ 대기 중"}</span>
@@ -539,7 +543,11 @@ export default function DealerRoom({
             ) : !canAct ? (
               <div className="dealer-wait-card">
                 <h3 className="brand-font">{STATUS_TEXT[status] || "대기 중"}</h3>
-                <p>상대방 차례이거나 마스터 대기 중입니다. 차례가 돌아오면 활성화됩니다.</p>
+                <p>
+                  {status === "ACTION_PHASE" && isBus1ActionSubmitted && isBus2ActionSubmitted
+                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    : "상대방 차례이거나 마스터 대기 중입니다. 차례가 돌아오면 활성화됩니다."}
+                </p>
               </div>
             ) : (
               <>
