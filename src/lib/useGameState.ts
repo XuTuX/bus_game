@@ -75,7 +75,9 @@ export function usePublicGame(roomCode: string) {
     if (!roomCode) return;
     const fetchState = async () => {
       try {
-        const res = await fetch(`/api/game/${roomCode}/public`);
+        const res = await fetch(`/api/game/${roomCode}/public`, {
+          cache: "no-store",
+        });
         if (res.ok) {
           const json = await parseJsonResponse<PublicStateResult>(res);
           if (json) {
@@ -105,7 +107,9 @@ export function usePrivateGame(roomCode: string, playerId: string) {
     }
     const fetchState = async () => {
       try {
-        const res = await fetch(`/api/game/${roomCode}/player/${playerId}`);
+        const res = await fetch(`/api/game/${roomCode}/player/${playerId}`, {
+          cache: "no-store",
+        });
         if (res.ok) {
           const json = await parseJsonResponse<PrivateStateResult>(res);
           if (json) {

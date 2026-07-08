@@ -3,6 +3,9 @@ import { submitTurn } from "@/server/gameStore";
 import { type TurnAction } from "@/lib/game";
 import { getErrorMessage } from "@/server/apiError";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ roomCode: string }> }
@@ -26,7 +29,14 @@ export async function POST(
 
     await submitTurn(roomCode, playerId, actions || [], bus, mode);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      }
+    );
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
