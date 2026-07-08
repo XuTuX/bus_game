@@ -122,8 +122,8 @@ export default function Board({
         const shouldShowFacing =
           showFacing && (!showFacingFor || showFacingFor === typedBusType);
         const step = tileSize + tileGap;
-        const width = 68;
-        const height = shouldShowFacing ? 26 : 28;
+        const width = 76;
+        const height = shouldShowFacing ? 30 : 30;
         const left = 12 + busState.pos.x * step + tileSize / 2 - width / 2;
         const top = 12 + busState.pos.y * step + tileSize / 2 - height / 2;
         const offset = busType === BusType.BUS1 ? -18 : 18;
@@ -141,7 +141,12 @@ export default function Board({
               transform: shouldShowFacing ? `rotate(${rotation}deg)` : "none",
             }}
           >
-            <span className="bus-marker-label">
+            <span
+              className="bus-marker-label"
+              style={{
+                transform: shouldShowFacing ? `rotate(${-rotation}deg)` : undefined,
+              }}
+            >
               {busType === BusType.BUS1 ? "1번 버스" : "2번 버스"}
             </span>
             {shouldShowFacing && <span className="bus-marker-head" />}

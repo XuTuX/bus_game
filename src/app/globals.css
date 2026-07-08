@@ -108,6 +108,9 @@ h1, h2, h3, .brand-font {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .loading-screen {
@@ -123,6 +126,9 @@ h1, h2, h3, .brand-font {
   border-radius: var(--radius-xl);
   border: none;
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -245,14 +251,15 @@ h1, h2, h3, .brand-font {
 /* ─── Bus markers ─── */
 .bus-marker {
   position: absolute;
-  width: 68px;
-  height: 26px;
+  width: 76px;
+  height: 30px;
   border-radius: 8px 13px 13px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
+  padding: 0 9px;
   z-index: 5;
   transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
@@ -264,6 +271,7 @@ h1, h2, h3, .brand-font {
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
+  overflow: visible;
 }
 
 .bus-marker-BUS1 {
@@ -281,7 +289,16 @@ h1, h2, h3, .brand-font {
 }
 
 .bus-marker-label {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
   line-height: 1;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  transform-origin: center;
   white-space: nowrap;
   position: relative;
   z-index: 2;
@@ -289,12 +306,12 @@ h1, h2, h3, .brand-font {
 
 .bus-marker-head {
   position: absolute;
-  right: -10px;
+  right: -11px;
   width: 0;
   height: 0;
-  border-top: 9px solid transparent;
-  border-bottom: 9px solid transparent;
-  border-left: 13px solid var(--bus-marker-fill);
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid var(--bus-marker-fill);
   filter: drop-shadow(2px 0 0 white);
 }
 
@@ -692,11 +709,12 @@ h1, h2, h3, .brand-font {
 
 .admin-main {
   display: grid;
-  grid-template-columns: minmax(460px, 1fr) minmax(300px, 380px) minmax(300px, 380px);
-  gap: 24px;
-  width: min(1400px, calc(100% - 40px));
+  grid-template-columns: minmax(560px, 1fr) minmax(360px, 460px);
+  gap: 18px;
+  width: min(1280px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0;
+  padding: 18px 0 24px;
+  align-items: start;
 }
 
 .admin-control-panel,
@@ -704,17 +722,30 @@ h1, h2, h3, .brand-font {
   align-self: start;
 }
 
+.admin-main .dealer-board-pane {
+  grid-row: 1 / span 2;
+  position: sticky;
+  top: 18px;
+}
+
+.admin-control-panel,
+.admin-player-panel {
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
 .admin-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .admin-summary div {
   background: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px;
   text-align: left;
   min-width: 0;
 }
@@ -733,9 +764,9 @@ h1, h2, h3, .brand-font {
 
 .admin-summary strong {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   font-family: 'Fredoka', sans-serif;
-  font-size: 1.1rem;
+  font-size: 1rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -749,14 +780,14 @@ h1, h2, h3, .brand-font {
 
 .timer-settings-form {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto auto;
-  gap: 12px;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 20px;
-  padding: 14px;
+  margin-bottom: 12px;
+  padding: 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
 }
 
 .timer-settings-form label {
@@ -788,14 +819,15 @@ h1, h2, h3, .brand-font {
 }
 
 .timer-save-state {
-  align-self: center;
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
+  text-align: right;
 }
 
 .timer-start-btn {
+  grid-column: 1 / -1;
   box-shadow: none;
   padding: 12px 18px;
   white-space: nowrap;
@@ -847,18 +879,21 @@ h1, h2, h3, .brand-font {
 .master-waiting {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 28px;
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  text-align: left;
 }
 
 .master-card-form {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px;
+  margin-top: 12px;
+  padding: 16px;
+  text-align: left;
 }
 
 .master-card-form select,
@@ -888,7 +923,7 @@ h1, h2, h3, .brand-font {
 .panel-title-row {
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .panel-title-row span {
@@ -1701,6 +1736,18 @@ h1, h2, h3, .brand-font {
   }
 }
 
+@media (max-width: 1100px) {
+  .admin-main {
+    grid-template-columns: 1fr;
+    width: calc(100% - 24px);
+  }
+
+  .admin-main .dealer-board-pane {
+    grid-row: auto;
+    position: static;
+  }
+}
+
 @media (max-width: 860px) {
   .home-actions,
   .admin-main {
@@ -1791,8 +1838,8 @@ h1, h2, h3, .brand-font {
 
 /* Compact bus marker override */
 .bus-marker-round {
-  width: 68px !important;
-  height: 28px !important;
+  width: 76px !important;
+  height: 30px !important;
   border-radius: 999px !important;
 }
 

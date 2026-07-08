@@ -204,7 +204,7 @@ export default function AdminPage({
                 rel="noopener noreferrer"
                 style={{ background: "var(--bus1-color)", borderColor: "var(--bus1-color)" }}
               >
-                버스 1 딜러룸 열기
+                버스 1
               </Link>
               <Link
                 href={`/dealer/${roomCode}/bus2`}
@@ -213,7 +213,7 @@ export default function AdminPage({
                 rel="noopener noreferrer"
                 style={{ background: "var(--bus2-color)", borderColor: "var(--bus2-color)" }}
               >
-                버스 2 딜러룸 열기
+                버스 2
               </Link>
               <Link
                 href={`/dealer/${roomCode}/subway`}
@@ -222,7 +222,7 @@ export default function AdminPage({
                 rel="noopener noreferrer"
                 style={{ background: "var(--text-primary)", borderColor: "var(--text-primary)" }}
               >
-                지하철 조작 창 열기
+                지하철
               </Link>
             </>
           )}
