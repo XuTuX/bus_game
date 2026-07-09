@@ -193,11 +193,11 @@ function submitSubwayMovePhase(
     subway,
     action: action
       ? {
-          type: "MOVE",
-          bus: subway,
-          subway: true,
-          cardIndex: action.cardIndex,
-        }
+        type: "MOVE",
+        bus: subway,
+        subway: true,
+        cardIndex: action.cardIndex,
+      }
       : null,
     cardKind: action ? player.hand[action.cardIndex]?.kind : undefined,
     submittedOrder: nextSubwaySubmissionOrder(room),
@@ -356,7 +356,7 @@ export function finalizeTurnResult(room: RoomState) {
   }
 
   const regionGains = scoreCurrentBusRegions(clone);
-  
+
   if (regionGains.BUS1) {
     const tName = TEAM_NAMES_KO[regionGains.BUS1.team] || regionGains.BUS1.team;
     actionDetails.push({
@@ -441,7 +441,7 @@ function appendMoveLogActions(
     const result = results[index];
     const playedCard = playedCards[index];
     let label = playedCard ? cardLabel(playedCard) : actionLabel(move, []);
-    
+
     if (result.scoreChanges && Object.keys(result.scoreChanges).length > 0) {
       const parts: string[] = [];
       for (const [team, delta] of Object.entries(result.scoreChanges)) {
@@ -584,7 +584,7 @@ function appendScoreDeltaLogActions(
       points: delta,
     });
   }
-  
+
   if (parts.length > 0) {
     actionDetails.push({
       actionLabel: `${label} : ${parts.join(", ")}`,
@@ -679,14 +679,14 @@ function scoreCurrentBusRegions(game: GameState) {
   if (bus2Color) {
     game.teamScores[bus2Color] += bus2Size;
   }
-  
+
   return { BUS1: bus1Gained, BUS2: bus2Gained };
 }
 
 function scoreBusDistancePenalty(game: GameState, team: GameState["players"][number]["team"]) {
   const bus1 = game.buses.BUS1.pos;
   const bus2 = game.buses.BUS2.pos;
-  const distance = Math.max(Math.abs(bus1.x - bus2.x), Math.abs(bus1.y - bus2.y));
+  const distance = Math.abs(bus1.x - bus2.x) + Math.abs(bus1.y - bus2.y);
   const penalty = distance <= 1 ? 5 : distance <= 2 ? 2 : 0;
 
   if (penalty > 0) {
