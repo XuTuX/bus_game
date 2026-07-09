@@ -389,23 +389,20 @@ export function finalizeTurnResult(room: RoomState) {
     });
   }
 
-  let subwayActionApplied = false;
   getOrderedSubwaySubmissions(room).forEach((submission) => {
-    subwayActionApplied = appendSubwayLogAction(actionDetails, clone, submission) || subwayActionApplied;
+    appendSubwayLogAction(actionDetails, clone, submission);
   });
 
-  if (subwayActionApplied) {
-    const beforeSubwayScores = { ...clone.teamScores };
-    scoreSubwayTiles(clone);
-    appendScoreDeltaLogActions(
-      actionDetails,
-      actionScoreDetails,
-      beforeSubwayScores,
-      clone.teamScores,
-      "지하철 점수",
-      "SUBWAY"
-    );
-  }
+  const beforeSubwayScores = { ...clone.teamScores };
+  scoreSubwayTiles(clone);
+  appendScoreDeltaLogActions(
+    actionDetails,
+    actionScoreDetails,
+    beforeSubwayScores,
+    clone.teamScores,
+    "지하철 점수",
+    "SUBWAY"
+  );
 
   addTurnLog(
     room,
