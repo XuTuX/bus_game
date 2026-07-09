@@ -23,6 +23,7 @@ const CARD_NAMES: Record<CardKind, string> = {
   STRAIGHT1: "1칸 직진",
   STRAIGHT2: "2칸 직진",
   STRAIGHT3: "3칸 직진",
+  STRAIGHT4: "4칸 직진",
   LEFT: "좌회전",
   RIGHT: "우회전",
 };
@@ -47,6 +48,7 @@ const CARD_ORDER: CardKind[] = [
   "STRAIGHT1",
   "STRAIGHT2",
   "STRAIGHT3",
+  "STRAIGHT4",
   "LEFT",
   "RIGHT",
 ];

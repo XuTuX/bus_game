@@ -295,6 +295,7 @@ function subwaySubmissionLabel(cardKind?: CardKind): string {
   if (cardKind === "STRAIGHT1") return "직진 x 1";
   if (cardKind === "STRAIGHT2") return "직진 x 2";
   if (cardKind === "STRAIGHT3") return "직진 x 3";
+  if (cardKind === "STRAIGHT4") return "직진 x 4";
   if (cardKind === "LEFT") return "좌회전";
   return "우회전";
 }

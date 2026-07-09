@@ -45,6 +45,7 @@ const CARD_KINDS: CardKind[] = [
   "STRAIGHT1",
   "STRAIGHT2",
   "STRAIGHT3",
+  "STRAIGHT4",
   "LEFT",
   "RIGHT",
 ];

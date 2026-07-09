@@ -30,6 +30,7 @@ const CARD_ICONS: Record<CardKind, string> = {
   STRAIGHT1: "➡️",
   STRAIGHT2: "⏩",
   STRAIGHT3: "⏭️",
+  STRAIGHT4: "⏩⏩",
   LEFT: "↩️",
   RIGHT: "↪️",
 };
@@ -38,6 +39,7 @@ const CARD_NAMES: Record<CardKind, string> = {
   STRAIGHT1: "1칸 직진",
   STRAIGHT2: "2칸 직진",
   STRAIGHT3: "3칸 직진",
+  STRAIGHT4: "4칸 직진",
   LEFT: "좌회전",
   RIGHT: "우회전",
 };
@@ -306,7 +308,7 @@ export default function DealerRoom({
           setAnimatedGame({ ...animClone });
           await delay(600); // Wait for turn rotation visual
         } else {
-          const distance = kind === "STRAIGHT1" ? 1 : kind === "STRAIGHT2" ? 2 : 3;
+          const distance = kind === "STRAIGHT1" ? 1 : kind === "STRAIGHT2" ? 2 : kind === "STRAIGHT3" ? 3 : 4;
 
           for (let stepIdx = 0; stepIdx < distance; stepIdx++) {
             const next = stepCoord(bus.pos, bus.facing);
@@ -580,7 +582,7 @@ export default function DealerRoom({
                     <div className="grouped-cards-container" style={{ marginBottom: 20 }}>
                       {moveCategory === "FORWARD" ? (
                         <>
-                          {(["STRAIGHT1", "STRAIGHT2", "STRAIGHT3"] as const).map((kind) => {
+                          {(["STRAIGHT1", "STRAIGHT2", "STRAIGHT3", "STRAIGHT4"] as const).map((kind) => {
                             const count = getCardCount(kind);
                             const isDisabled = count <= 0 || selectedMoves.length >= 3 || submitting;
                             return (

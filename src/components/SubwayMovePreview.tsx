@@ -13,6 +13,7 @@ const MOVE_GLYPHS: Record<CardKind, { icon: string; count?: number; label: strin
   STRAIGHT1: { icon: "→", count: 1, label: "직진" },
   STRAIGHT2: { icon: "→", count: 2, label: "직진" },
   STRAIGHT3: { icon: "→", count: 3, label: "직진" },
+  STRAIGHT4: { icon: "→", count: 4, label: "직진" },
   LEFT: { icon: "↶", label: "좌회전" },
   RIGHT: { icon: "↷", label: "우회전" },
 };

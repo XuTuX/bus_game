@@ -19,7 +19,7 @@ export enum BusType {
 }
 
 export type Coord = { x: number; y: number };
-export type CardKind = "STRAIGHT1" | "STRAIGHT2" | "STRAIGHT3" | "LEFT" | "RIGHT";
+export type CardKind = "STRAIGHT1" | "STRAIGHT2" | "STRAIGHT3" | "STRAIGHT4" | "LEFT" | "RIGHT";
 export type Rng = () => number;
 
 export interface Tile {
@@ -150,7 +150,7 @@ export function rotate(facing: Facing, direction: "L" | "R"): Facing {
   return order[next % order.length];
 }
 
-export function move(coord: Coord, facing: Facing, distance: 1 | 2 | 3): Coord[] {
+export function move(coord: Coord, facing: Facing, distance: 1 | 2 | 3 | 4): Coord[] {
   const path: Coord[] = [];
   let current = { ...coord };
   for (let i = 0; i < distance; i += 1) {
@@ -406,6 +406,7 @@ export function runMovePhase(
   player: Player,
   actions: MoveTurnAction[],
   game: GameState,
+
   options: { scoreSubwaysAtEnd?: boolean } = {}
 ): StepResult[] {
   if (isGameOver(game)) {
@@ -675,6 +676,8 @@ export function cardLabel(card: Card): string {
       return "직진 2칸";
     case "STRAIGHT3":
       return "직진 3칸";
+    case "STRAIGHT4":
+      return "직진 4칸";
     case "LEFT":
       return "좌회전";
     case "RIGHT":
@@ -726,10 +729,11 @@ export function stepCoord(coord: Coord, facing: Facing): Coord {
   }
 }
 
-function straightDistance(kind: CardKind): 1 | 2 | 3 {
+function straightDistance(kind: CardKind): 1 | 2 | 3 | 4 {
   if (kind === "STRAIGHT1") return 1;
   if (kind === "STRAIGHT2") return 2;
   if (kind === "STRAIGHT3") return 3;
+  if (kind === "STRAIGHT4") return 4;
   throw new Error(`${kind} is not a straight card`);
 }
 

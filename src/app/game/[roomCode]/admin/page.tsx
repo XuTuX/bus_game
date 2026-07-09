@@ -1,5 +1,6 @@
 "use client";
 
+
 import Link from "next/link";
 import { FormEvent, use, useEffect, useState } from "react";
 import Board from "@/components/Board";
@@ -47,6 +48,7 @@ const CARD_LABELS: Record<CardKind, string> = {
   STRAIGHT1: "1칸 직진",
   STRAIGHT2: "2칸 직진",
   STRAIGHT3: "3칸 직진",
+  STRAIGHT4: "4칸 직진",
   LEFT: "좌회전",
   RIGHT: "우회전",
 };
@@ -55,6 +57,7 @@ const CARD_ICONS: Record<CardKind, string> = {
   STRAIGHT1: "➡️",
   STRAIGHT2: "⏩",
   STRAIGHT3: "⏭️",
+  STRAIGHT4: "⏩⏩",
   LEFT: "↩️",
   RIGHT: "↪️",
 };
