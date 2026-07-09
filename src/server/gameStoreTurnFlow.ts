@@ -64,7 +64,37 @@ export function submitTurnToRoom(
   }
 
   if (mode === "CANCEL") {
-    throw new Error("지원하지 않는 취소 요청입니다.");
+    const bus = submittedBus;
+    if (!bus) {
+      throw new Error("취소할 버스를 지정해야 합니다.");
+    }
+
+    const { bus1Player, bus2Player } = getTurnControllers(room.game);
+    const isBus1Controller = player.id === bus1Player?.id;
+    const isBus2Controller = player.id === bus2Player?.id;
+
+    if (bus === BusType.BUS1 && !isBus1Controller) {
+      throw new Error("BUS1 버스 조작 권한이 없습니다.");
+    }
+    if (bus === BusType.BUS2 && !isBus2Controller) {
+      throw new Error("BUS2 버스 조작 권한이 없습니다.");
+    }
+
+    // 이동 제출 취소
+    if (bus === BusType.BUS1) {
+      room.pendingMoves.BUS1 = undefined;
+      room.pendingActions.BUS1 = undefined;
+    } else {
+      room.pendingMoves.BUS2 = undefined;
+      room.pendingActions.BUS2 = undefined;
+    }
+
+    // 두 버스 중 하나만 취소했는데 상태가 ACTION_PHASE였으면 CHOOSING으로 되돌림
+    if (room.status === "ACTION_PHASE") {
+      room.status = "CHOOSING";
+      clearPhaseTimer(room);
+    }
+    return;
   }
 
   if (mode === "SUBWAY") {
