@@ -128,13 +128,13 @@ export default function AdminPage({
   const playerOptions = game.players.length > 0
     ? game.players
     : participants
-        .filter((participant) => participant.colour)
-        .map((participant) => ({
-          id: participant.id,
-          name: participant.name,
-          team: participant.colour as Colour,
-          hand: [],
-        }));
+      .filter((participant) => participant.colour)
+      .map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+        team: participant.colour as Colour,
+        hand: [],
+      }));
   const canStartGame = participants.length > 0;
   const subwaySubmissionValues = Object.values(state.pendingSubwayMoves ?? {});
   const areSubwaysSubmitted =
@@ -151,10 +151,10 @@ export default function AdminPage({
       : canEndTurn
         ? "이번 턴 종료"
         : status === "WAITING"
-      ? "입력 시작"
-      : status === "CHOOSING" || status === "ACTION_PHASE"
-        ? "타이머 시작"
-        : "시간 저장";
+          ? "입력 시작"
+          : status === "CHOOSING" || status === "ACTION_PHASE"
+            ? "타이머 시작"
+            : "시간 저장";
   const turnPhaseLabel =
     status === "CHOOSING"
       ? "이동 제출"
@@ -310,7 +310,7 @@ export default function AdminPage({
           <div className="admin-summary">
             <div>
               <span>라운드</span>
-              <strong>{Math.min(game.roundIndex + 1, 8)} / 8</strong>
+              <strong>{Math.min(game.roundIndex + 1, 7)} / 7</strong>
             </div>
             <div>
               <span>상태</span>
@@ -698,9 +698,9 @@ function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
           const cardPlays = sortedLogs.flatMap((log) => log.cardPlays ?? []);
           const scoreDetails = sortedLogs.flatMap((log) => log.scoreDetails ?? []);
           const cardSummary = summarizeCardPlays(cardPlays);
-          
+
           if (allActions.length === 0 && cardPlays.length === 0 && scoreDetails.length === 0) return null;
-          
+
           return (
             <div key={key} className="turn-history-group" style={{ background: "var(--bg-secondary)", padding: 16, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-sm)", display: "grid", gap: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>

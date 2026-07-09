@@ -107,7 +107,7 @@ export default function DealerRoom({
 
   const privateState = usePrivateGame(roomCode, resolvedPlayerId);
   const phaseTimeLabel = usePhaseTimeLabel(publicState);
-  
+
   // Simulated state for step-by-step client-side movement animation
   const [animatedGame, setAnimatedGame] = useState<GameState | null>(null);
   const [submittedPreviewGame, setSubmittedPreviewGame] = useState<GameState | null>(null);
@@ -211,14 +211,14 @@ export default function DealerRoom({
   const hasISubmittedMoves = roomBus
     ? isSelectedBusController && isSelectedMoveSubmitted
     : ((isBus1Controller && isBus1Submitted) || !isBus1Controller) &&
-      ((isBus2Controller && isBus2Submitted) || !isBus2Controller) &&
-      (isBus1Controller || isBus2Controller);
+    ((isBus2Controller && isBus2Submitted) || !isBus2Controller) &&
+    (isBus1Controller || isBus2Controller);
 
   const hasISubmittedAction = roomBus
     ? isSelectedBusController && isSelectedActionSubmitted
     : ((isBus1Controller && isBus1ActionSubmitted) || !isBus1Controller) &&
-      ((isBus2Controller && isBus2ActionSubmitted) || !isBus2Controller) &&
-      (isBus1Controller || isBus2Controller);
+    ((isBus2Controller && isBus2ActionSubmitted) || !isBus2Controller) &&
+    (isBus1Controller || isBus2Controller);
 
   const canAct =
     privateState?.isMyTurn &&
@@ -374,7 +374,7 @@ export default function DealerRoom({
   const handleCancelSubmission = async (bus: BusType) => {
     if (!resolvedPlayerId || submitting) return;
     if (!confirm("정말 제출을 취소하시겠습니까?")) return;
-    
+
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -477,7 +477,7 @@ export default function DealerRoom({
                 <h3 className="brand-font" style={{ color: "var(--bus2-color)" }}>행동 제출 완료!</h3>
                 <p style={{ marginTop: 8 }}>
                   {isBus1ActionSubmitted && isBus2ActionSubmitted
-                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    ? "이동 단계와 행동 단계가 모두 끝나면 결과 단계로 넘어갑니다."
                     : "다른 버스의 타일 교환 제출을 기다리고 있습니다..."}
                 </p>
                 <div className="status-metadata" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -495,7 +495,7 @@ export default function DealerRoom({
                 <h3 className="brand-font">{STATUS_TEXT[status] || "대기 중"}</h3>
                 <p>
                   {status === "ACTION_PHASE" && isBus1ActionSubmitted && isBus2ActionSubmitted
-                    ? "마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다."
+                    ? "이동 단계와 행동 단계가 모두 끝나면 결과 단계로 넘어갑니다."
                     : "상대방 차례이거나 마스터 대기 중입니다. 차례가 돌아오면 활성화됩니다."}
                 </p>
               </div>
@@ -691,9 +691,8 @@ export default function DealerRoom({
                               key={index}
                               type="button"
                               disabled={!inBounds}
-                              className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${
-                                isSelected ? "selected" : ""
-                              } ${!inBounds ? "disabled" : ""}`}
+                              className={`action-grid-cell tile tile-${tile?.colour} ${isCenter ? "center-cell" : ""} ${isSelected ? "selected" : ""
+                                } ${!inBounds ? "disabled" : ""}`}
                               onClick={() => {
                                 setActionTarget({ x: tx, y: ty });
                               }}

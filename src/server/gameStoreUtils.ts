@@ -58,7 +58,7 @@ function getNextTurnTeam(game: GameState): Colour | undefined {
   }
 
   const nextRoundIndex = game.roundIndex + 1;
-  if (nextRoundIndex >= 8) {
+  if (nextRoundIndex >= 7) {
     return undefined;
   }
 
@@ -128,3 +128,4 @@ export function findClonePlayer(game: GameState, playerId: string): GameState["p
 export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
+

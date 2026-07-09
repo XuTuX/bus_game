@@ -55,32 +55,12 @@ export default function PublicBoardPage({
       <aside className="public-sidebar">
         <section className="public-compact-card">
           <h2 className="brand-font">현재 라운드</h2>
-          <div className="public-round-value">{Math.min(game.roundIndex + 1, 8)} / 8</div>
+          <div className="public-round-value">{Math.min(game.roundIndex + 1, 7)} / 7</div>
           <div className="public-status">{STATUS_LABELS[status]}</div>
           <div className="public-meta-lines">
             <span>남은 시간 {phaseTimeLabel || "0:00"}</span>
           </div>
-          {status === "ACTION_PHASE" &&
-            state.pendingActions?.BUS1 &&
-            state.pendingActions?.BUS2 && (
-              <div
-                className="public-turn-ready-notice"
-                style={{
-                  marginTop: 12,
-                  padding: "8px 10px",
-                  background: "rgba(253, 121, 168, 0.12)",
-                  borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--team-purple)",
-                  fontSize: "0.78rem",
-                  color: "var(--team-purple)",
-                  fontWeight: 600,
-                  textAlign: "left",
-                  lineHeight: 1.4,
-                }}
-              >
-                📢 마스터가 직접 이번 턴 종료를 눌러야 결과 단계로 넘어가도록 변경했습니다.
-              </div>
-            )}
+
         </section>
 
         <section className="public-compact-card">
@@ -267,17 +247,17 @@ function getCompactPlayerRooms(
   const sources =
     game.players.length > 0
       ? game.players.map((player) => ({
-          id: player.id,
-          name: player.name ?? player.id,
-          team: player.team,
-        }))
+        id: player.id,
+        name: player.name ?? player.id,
+        team: player.team,
+      }))
       : participants
-          .filter((participant): participant is { id: string; name: string; colour: Colour } => !!participant.colour)
-          .map((participant) => ({
-            id: participant.id,
-            name: participant.name,
-            team: participant.colour,
-          }));
+        .filter((participant): participant is { id: string; name: string; colour: Colour } => !!participant.colour)
+        .map((participant) => ({
+          id: participant.id,
+          name: participant.name,
+          team: participant.colour,
+        }));
 
   const colourOrder = getRoundColourOrder(game.roundIndex);
   const grouped = new Map<Colour, typeof sources>();
