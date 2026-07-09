@@ -134,8 +134,6 @@ export function getRoundColourOrder(roundIndex: number): Colour[] {
     [Colour.Red, Colour.Purple, Colour.Green, Colour.Blue, Colour.Yellow],
     // 7R (index 6): 파랑, 빨강, 초록, 보라(퍼플), 노랑
     [Colour.Blue, Colour.Red, Colour.Green, Colour.Purple, Colour.Yellow],
-    // 8R (index 7): 보라(퍼플), 파랑, 빨강, 노랑, 초록
-    [Colour.Purple, Colour.Blue, Colour.Red, Colour.Yellow, Colour.Green],
   ];
   return orders[roundIndex % orders.length];
 }
@@ -290,7 +288,7 @@ export function stepSubway(subway: SubwayState, card: Card): StepResult {
     subway.pos.pop();
     path.push(next);
   }
-  
+
   if (distance > 0) {
     logs.push(`지하철이 ${path.length}칸 이동했습니다.`);
   }
@@ -395,11 +393,11 @@ export function generateBoard(rng: Rng = Math.random): Tile[][] {
 
 export function dealHand(rng: Rng = Math.random): Card[] {
   const cards: Card[] = [
-    ...repeatCard("STRAIGHT1", 8),
-    ...repeatCard("STRAIGHT2", 7),
+    ...repeatCard("STRAIGHT1", 7),
+    ...repeatCard("STRAIGHT2", 6),
     ...repeatCard("STRAIGHT3", 5),
-    ...repeatCard("LEFT", 6),
-    ...repeatCard("RIGHT", 6),
+    ...repeatCard("LEFT", 5),
+    ...repeatCard("RIGHT", 5),
   ];
   return shuffle(cards, rng);
 }
@@ -429,7 +427,7 @@ export function runMovePhase(
   const results: StepResult[] = [];
   for (const action of actions) {
     const [card] = player.hand.splice(action.cardIndex, 1);
-    
+
     let result: StepResult;
     if (action.subway) {
       const busType = BusType.BUS1;
@@ -448,16 +446,16 @@ export function runMovePhase(
       const busType = action.bus ?? BusType.BUS1;
       const bus = game.buses[busType];
       result = step(bus, card, game, busType);
-      
+
       // Handle path scoring and arrivals
       let gained = 0;
       const scoreChanges: Partial<Record<Colour, number>> = {};
-      
+
       if (result.applied && result.path && result.path.length > 0) {
         for (const coord of result.path) {
           const tile = game.board[coord.y]?.[coord.x];
           if (!tile || !tile.colour) continue;
-          
+
           const score = 1 + (tile.scoreBonus ?? 0);
           game.teamScores[tile.colour] += score;
           scoreChanges[tile.colour] = (scoreChanges[tile.colour] ?? 0) + score;
@@ -474,12 +472,12 @@ export function runMovePhase(
       result.scoreChanges = scoreChanges;
       // Distance Penalty moved to end of turn
     }
-    
+
     // Add logs to global game logs
     if (result.logs && result.logs.length > 0) {
       game.logs.push(...result.logs);
     }
-    
+
     results.push(result);
   }
 
@@ -588,7 +586,7 @@ export function nextRound(game: GameState): void {
 }
 
 export function isGameOver(game: GameState): boolean {
-  return game.roundIndex >= 8;
+  return game.roundIndex >= 7;
 }
 
 export function createGame(rng: Rng = Math.random, playerSeeds?: PlayerSeed[]): GameState {
