@@ -63,10 +63,12 @@ export default function Board({
     }
   }
 
+  const activeSubway = game.subways?.[BusType.BUS1]?.active ? game.subways[BusType.BUS1] : null;
   const visibleSubwayPositions =
-    game.subways?.[BusType.BUS1]?.active && game.subways[BusType.BUS1].pos.length > 0
-      ? game.subways[BusType.BUS1].pos
+    activeSubway && activeSubway.pos.length > 0
+      ? activeSubway.pos
       : DEFAULT_SUBWAY_POS;
+  const subwayFacing = activeSubway?.facing ?? "E";
   const subwayTiles = new Map(
     visibleSubwayPositions.map((pos, index) => {
       const connections = [
@@ -104,11 +106,9 @@ export default function Board({
             return (
               <div
                 key={`${x}-${y}`}
-                className={`tile tile-${tile.colour ?? 'gray'}${
-                  scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
-                } ${isSwapped ? "tile-swapped" : ""} ${isCenterBlocked ? "tile-center-blocked" : ""}${
-                  hasBus1 ? " tile-has-bus1" : ""
-                }${hasBus2 ? " tile-has-bus2" : ""}`}
+                className={`tile tile-${tile.colour ?? 'gray'}${scoredTiles.has(`${x},${y}`) ? " tile-scored" : ""
+                  } ${isSwapped ? "tile-swapped" : ""} ${isCenterBlocked ? "tile-center-blocked" : ""}${hasBus1 ? " tile-has-bus1" : ""
+                  }${hasBus2 ? " tile-has-bus2" : ""}`}
               >
                 {tile.scoreBonus ? (
                   <span className="tile-bonus">+{1 + tile.scoreBonus}</span>
@@ -130,13 +130,15 @@ export default function Board({
                       ))}
                     </span>
                     <span
-                      className={`tile-subway-marker ${
-                        subwayTile.isHead ? "tile-subway-marker-head" : ""
-                      }`}
+                      className={`tile-subway-marker ${subwayTile.isHead ? "tile-subway-marker-head" : ""
+                        }`}
                     >
                       {subwayTile.isHead ? (
                         <>
-                          <span className="tile-subway-window" />
+                          <span
+                            className="tile-subway-head-arrow"
+                            style={{ transform: `rotate(${FACING_ROTATION[subwayFacing] ?? 0}deg)` }}
+                          />
                           <span className="tile-subway-label">M</span>
                         </>
                       ) : (
@@ -206,11 +208,9 @@ export default function Board({
         return (
           <div
             key={busType}
-            className={`bus-marker bus-marker-${busType} ${
-              !shouldShowFacing ? "bus-marker-round" : ""
-            } ${
-              focusBus && focusBus !== typedBusType ? "bus-marker-dimmed" : ""
-            }`}
+            className={`bus-marker bus-marker-${busType} ${!shouldShowFacing ? "bus-marker-round" : ""
+              } ${focusBus && focusBus !== typedBusType ? "bus-marker-dimmed" : ""
+              }`}
             style={{
               left: left + offset,
               top: top + offset,
