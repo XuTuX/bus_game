@@ -678,10 +678,9 @@ function getBusSubmissionState(
 function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
   if (!logs || logs.length === 0) return null;
 
-  // Group logs by Round and Turn using the Team as header
   const groupedLogs = logs.reduce((acc, log) => {
     const teamLabel = TEAM_LABELS[log.team as Colour] ? `${TEAM_LABELS[log.team as Colour]}팀` : log.team;
-    const key = `라운드 ${log.round} ${teamLabel}`;
+    const key = `R${log.round} T${log.turn} ${teamLabel}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(log);
     return acc;
@@ -694,40 +693,161 @@ function TurnHistoryLog({ logs }: { logs: LogEntry[] }) {
       </div>
       <div className="turn-history-feed" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
         {Object.entries(groupedLogs).map(([key, groupLogs]) => {
-          // Sort group logs so MOVE phase comes before ACTION phase
-          groupLogs.sort((a, b) => (a.phase === "MOVE" ? -1 : 1));
-          const allActions = groupLogs.flatMap(l => l.actions);
+          const sortedLogs = [...groupLogs].sort((a, b) => phaseOrder(a.phase) - phaseOrder(b.phase));
+          const allActions = sortedLogs.flatMap((log) => log.actions);
+          const cardPlays = sortedLogs.flatMap((log) => log.cardPlays ?? []);
+          const scoreDetails = sortedLogs.flatMap((log) => log.scoreDetails ?? []);
+          const cardSummary = summarizeCardPlays(cardPlays);
           
-          if (allActions.length === 0) return null;
+          if (allActions.length === 0 && cardPlays.length === 0 && scoreDetails.length === 0) return null;
           
           return (
-            <div key={key} className="turn-history-group" style={{ background: "var(--bg-secondary)", padding: 16, borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-sm)" }}>
-              <div style={{ fontSize: "1.1rem", color: "var(--text-secondary)", marginBottom: 12, fontWeight: "bold", fontFamily: "Fredoka, sans-serif" }}>{key}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {allActions.map((action, idx) => {
-                  const isBusMove = !action.actionLabel.startsWith("지하철") && !action.actionLabel.includes("점수") && !action.actionLabel.includes("보너스") && !action.actionLabel.includes("감점") && !action.actionLabel.includes("타일") && !action.actionLabel.includes("페널티");
-                  const busPrefix = isBusMove ? (action.bus === "BUS1" ? "버스 1 " : "버스 2 ") : "";
-                  
-                  return (
-                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "1rem", padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
-                      <span>
-                        {busPrefix && <strong style={{ color: action.bus === "BUS1" ? "var(--bus1-color)" : "var(--bus2-color)", marginRight: 4 }}>{busPrefix.trim()}</strong>}
-                        {busPrefix ? " " : ""}
-                        {action.actionLabel}
-                      </span>
-                      {action.scoreGained !== 0 && (
-                        <strong style={{ color: action.scoreGained > 0 ? "var(--team-blue)" : "var(--team-red)", flexShrink: 0, marginLeft: 8 }}>
-                          {action.scoreGained > 0 ? "+" : ""}{action.scoreGained}점
-                        </strong>
-                      )}
-                    </div>
-                  );
-                })}
+            <div key={key} className="turn-history-group" style={{ background: "var(--bg-secondary)", padding: 16, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-sm)", display: "grid", gap: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div style={{ fontSize: "1.05rem", color: "var(--text-primary)", fontWeight: 800, fontFamily: "Fredoka, sans-serif" }}>{key}</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{scoreDetails.length}개 점수 기록</div>
               </div>
+
+              {cardSummary.length > 0 && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <HistorySectionTitle title="팀별 카드 사용" />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {cardSummary.map((item) => (
+                      <span key={item.key} style={{ border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "5px 8px", background: "var(--bg-primary)", fontSize: "0.82rem" }}>
+                        <strong style={{ color: TEAM_COLOUR_VARS[item.team] }}>{TEAM_LABELS[item.team]}</strong>
+                        {" "}{item.cardLabel} x {item.count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cardPlays.length > 0 && (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <HistorySectionTitle title="제출 카드" />
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+                    <CardPlayColumn title="버스 1 카드" plays={cardPlays.filter((play) => play.source === "BUS1")} />
+                    <CardPlayColumn title="버스 2 카드" plays={cardPlays.filter((play) => play.source === "BUS2")} />
+                    <CardPlayColumn title="지하철 카드" plays={cardPlays.filter((play) => play.source === "SUBWAY")} />
+                  </div>
+                </div>
+              )}
+
+              {scoreDetails.length > 0 ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <HistorySectionTitle title="점수 내역" />
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {scoreDetails.map((detail, index) => (
+                      <div key={`${detail.label}-${detail.team}-${index}`} style={{ display: "grid", gridTemplateColumns: "78px 1fr auto", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: "0.86rem" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>{historySourceLabel(detail.source)}</span>
+                        <span>
+                          {detail.label} · <strong style={{ color: TEAM_COLOUR_VARS[detail.team] }}>{TEAM_LABELS[detail.team]}</strong>
+                        </span>
+                        <strong style={{ color: detail.points >= 0 ? "var(--team-blue)" : "var(--team-red)" }}>
+                          {detail.points > 0 ? "+" : ""}{detail.points}점
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <LegacyActionList actions={allActions} />
+              )}
             </div>
           );
         })}
       </div>
     </section>
   );
+}
+
+type HistoryCardPlay = NonNullable<LogEntry["cardPlays"]>[number];
+
+function phaseOrder(phase: LogEntry["phase"]) {
+  if (phase === "MOVE") return 0;
+  if (phase === "ACTION") return 1;
+  return 2;
+}
+
+function summarizeCardPlays(cardPlays: HistoryCardPlay[]) {
+  const summary = new Map<string, { key: string; team: Colour; cardLabel: string; count: number }>();
+
+  for (const play of cardPlays) {
+    if (!play.cardKind || play.count <= 0) continue;
+    const key = `${play.team}:${play.cardKind}`;
+    const existing = summary.get(key);
+    if (existing) {
+      existing.count += play.count;
+    } else {
+      summary.set(key, {
+        key,
+        team: play.team,
+        cardLabel: play.cardLabel,
+        count: play.count,
+      });
+    }
+  }
+
+  return [...summary.values()];
+}
+
+function CardPlayColumn({ title, plays }: { title: string; plays: HistoryCardPlay[] }) {
+  return (
+    <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 8, background: "var(--bg-primary)", padding: 10, display: "grid", gap: 6 }}>
+      <strong style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>{title}</strong>
+      {plays.length === 0 ? (
+        <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>제출 없음</span>
+      ) : (
+        plays.map((play, index) => (
+          <div key={`${play.playerId}-${play.cardLabel}-${index}`} style={{ display: "grid", gap: 2, fontSize: "0.84rem" }}>
+            <span style={{ color: TEAM_COLOUR_VARS[play.team], fontWeight: 700 }}>
+              {TEAM_LABELS[play.team]} · {play.playerName ?? play.playerId}
+            </span>
+            <span>{play.cardLabel}{play.count > 1 ? ` x ${play.count}` : ""}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function HistorySectionTitle({ title }: { title: string }) {
+  return (
+    <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 800, letterSpacing: 0 }}>
+      {title}
+    </div>
+  );
+}
+
+function LegacyActionList({ actions }: { actions: LogEntry["actions"] }) {
+  if (actions.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <HistorySectionTitle title="기존 기록" />
+      {actions.map((action, idx) => {
+        const isBusMove = !action.actionLabel.startsWith("지하철") && !action.actionLabel.includes("점수") && !action.actionLabel.includes("보너스") && !action.actionLabel.includes("감점") && !action.actionLabel.includes("타일") && !action.actionLabel.includes("페널티");
+        const busPrefix = isBusMove ? (action.bus === "BUS1" ? "버스 1 " : "버스 2 ") : "";
+
+        return (
+          <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
+            <span>
+              {busPrefix && <strong style={{ color: action.bus === "BUS1" ? "var(--bus1-color)" : "var(--bus2-color)", marginRight: 4 }}>{busPrefix.trim()}</strong>}
+              {busPrefix ? " " : ""}
+              {action.actionLabel}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function historySourceLabel(source: NonNullable<LogEntry["scoreDetails"]>[number]["source"]) {
+  if (source === "BUS1") return "버스 1";
+  if (source === "BUS2") return "버스 2";
+  if (source === "SUBWAY") return "지하철";
+  if (source === "BONUS") return "보너스";
+  if (source === "PENALTY") return "감점";
+  return "영역";
 }

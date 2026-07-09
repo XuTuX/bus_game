@@ -37,6 +37,22 @@ export interface LogEntry {
     reason?: string;
     scoreGained: number;
   }[];
+  cardPlays?: {
+    source: BusType | "SUBWAY";
+    playerId: string;
+    playerName?: string;
+    team: Colour;
+    cardKind?: CardKind;
+    cardLabel: string;
+    count: number;
+    submittedOrder?: number;
+  }[];
+  scoreDetails?: {
+    source: BusType | "SUBWAY" | "BONUS" | "PENALTY" | "REGION";
+    label: string;
+    team: Colour;
+    points: number;
+  }[];
   round: number;
   turn: number;
 }

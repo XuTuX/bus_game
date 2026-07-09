@@ -245,7 +245,7 @@ export async function submitTurn(
   playerId: string,
   actions: TurnAction[],
   submittedBus?: BusType,
-  mode?: "BUS" | "SUBWAY"
+  mode?: "BUS" | "SUBWAY" | "CANCEL" | "CANCEL_SUBWAY"
 ): Promise<void> {
   await mutateRoom(roomCode, (room) => {
     submitTurnToRoom(room, playerId, actions, submittedBus, mode);

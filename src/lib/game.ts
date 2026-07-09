@@ -278,6 +278,13 @@ export function stepSubway(subway: SubwayState, card: Card): StepResult {
       logs.push(`지하철이 중앙 회색 벽에 부딪혀 멈췄습니다.`);
       break;
     }
+    const bodyCollision = subway.pos
+      .slice(0, -1)
+      .some((body) => coordsEqual(body, next));
+    if (bodyCollision) {
+      logs.push(`지하철이 자기 몸통으로 되돌아갈 수 없어 멈췄습니다.`);
+      break;
+    }
     // Move body (Snake)
     subway.pos.unshift(next);
     subway.pos.pop();

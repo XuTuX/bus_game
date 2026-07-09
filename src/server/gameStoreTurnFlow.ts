@@ -38,13 +38,15 @@ const TEAM_NAMES_KO: Record<string, string> = {
   Blue: "블루팀",
 };
 
+type LogCardPlay = NonNullable<LogEntry["cardPlays"]>[number];
+type LogScoreDetail = NonNullable<LogEntry["scoreDetails"]>[number];
 
 export function submitTurnToRoom(
   room: RoomState,
   playerId: string,
   actions: TurnAction[],
   submittedBus?: BusType,
-  mode: "BUS" | "SUBWAY" = "BUS"
+  mode: "BUS" | "SUBWAY" | "CANCEL" | "CANCEL_SUBWAY" = "BUS"
 ) {
   // 제출은 이동 선택 단계와 행동 단계에서만 받습니다.
   if (room.status !== "CHOOSING" && room.status !== "ACTION_PHASE") {
@@ -54,6 +56,15 @@ export function submitTurnToRoom(
   const player = room.game.players.find((p) => p.id === playerId);
   if (!player) {
     throw new Error("플레이어를 찾을 수 없습니다.");
+  }
+
+  if (mode === "CANCEL_SUBWAY") {
+    delete room.pendingSubwayMoves?.[player.id];
+    return;
+  }
+
+  if (mode === "CANCEL") {
+    throw new Error("지원하지 않는 취소 요청입니다.");
   }
 
   if (mode === "SUBWAY") {
@@ -253,10 +264,16 @@ export function finalizeTurnResult(room: RoomState) {
   const clone = deepClone(room.game);
   clone.swappedTiles = [];
   const moveDetails: LogEntry["actions"] = [];
+  const moveCardPlays: LogCardPlay[] = [];
+  const moveScoreDetails: LogScoreDetail[] = [];
 
   if (bus1Player) {
+    moveCardPlays.push(
+      ...collectBusCardPlays(clone, bus1Player.id, room.pendingMoves.BUS1, BusType.BUS1)
+    );
     appendMoveLogActions(
       moveDetails,
+      moveScoreDetails,
       clone,
       bus1Player.id,
       room.pendingMoves.BUS1,
@@ -265,8 +282,12 @@ export function finalizeTurnResult(room: RoomState) {
   }
 
   if (bus2Player) {
+    moveCardPlays.push(
+      ...collectBusCardPlays(clone, bus2Player.id, room.pendingMoves.BUS2, BusType.BUS2)
+    );
     appendMoveLogActions(
       moveDetails,
+      moveScoreDetails,
       clone,
       bus2Player.id,
       room.pendingMoves.BUS2,
@@ -279,24 +300,40 @@ export function finalizeTurnResult(room: RoomState) {
   scoreMatchingBusDestinationBonus(clone, [busTeam]);
   appendScoreDeltaLogActions(
     moveDetails,
+    moveScoreDetails,
     beforeDestinationBonus,
     clone.teamScores,
-    "두 버스 같은 색 도착 보너스"
+    "두 버스 같은 색 도착 보너스",
+    "BONUS"
   );
 
   const beforeDistanceScores = { ...clone.teamScores };
   const distancePenalty = scoreBusDistancePenalty(clone, busTeam);
   appendScoreDeltaLogActions(
     moveDetails,
+    moveScoreDetails,
     beforeDistanceScores,
     clone.teamScores,
     distancePenalty
       ? `버스 간 거리 ${distancePenalty.distance}칸 감점`
-      : "버스 간 거리 감점"
+      : "버스 간 거리 감점",
+    "PENALTY"
   );
-  addTurnLog(room, moveDetails, room.game.roundIndex + 1, room.game.turnIndex + 1, "MOVE");
+  addTurnLog(
+    room,
+    moveDetails,
+    room.game.roundIndex + 1,
+    room.game.turnIndex + 1,
+    "MOVE",
+    {
+      cardPlays: moveCardPlays,
+      scoreDetails: moveScoreDetails,
+    }
+  );
 
   const actionDetails: LogEntry["actions"] = [];
+  const actionCardPlays: LogCardPlay[] = collectSubwayCardPlays(room);
+  const actionScoreDetails: LogScoreDetail[] = [];
 
   if (bus1Player) {
     appendActionLogAction(
@@ -328,6 +365,12 @@ export function finalizeTurnResult(room: RoomState) {
       applied: true,
       scoreGained: 0,
     });
+    actionScoreDetails.push({
+      source: "REGION",
+      label: "버스 1 영역점수",
+      team: regionGains.BUS1.team,
+      points: regionGains.BUS1.size,
+    });
   }
 
   if (regionGains.BUS2) {
@@ -337,6 +380,12 @@ export function finalizeTurnResult(room: RoomState) {
       bus: BusType.BUS2,
       applied: true,
       scoreGained: 0,
+    });
+    actionScoreDetails.push({
+      source: "REGION",
+      label: "버스 2 영역점수",
+      team: regionGains.BUS2.team,
+      points: regionGains.BUS2.size,
     });
   }
 
@@ -350,13 +399,25 @@ export function finalizeTurnResult(room: RoomState) {
     scoreSubwayTiles(clone);
     appendScoreDeltaLogActions(
       actionDetails,
+      actionScoreDetails,
       beforeSubwayScores,
       clone.teamScores,
-      "지하철 점수"
+      "지하철 점수",
+      "SUBWAY"
     );
   }
 
-  addTurnLog(room, actionDetails, clone.roundIndex + 1, clone.turnIndex + 1, "ACTION");
+  addTurnLog(
+    room,
+    actionDetails,
+    clone.roundIndex + 1,
+    clone.turnIndex + 1,
+    "ACTION",
+    {
+      cardPlays: actionCardPlays,
+      scoreDetails: actionScoreDetails,
+    }
+  );
 
   room.game = clone;
   room.status = "RESULT_PHASE";
@@ -369,18 +430,20 @@ export function finalizeTurnResult(room: RoomState) {
 
 function appendMoveLogActions(
   actionDetails: LogEntry["actions"],
+  scoreDetails: LogScoreDetail[],
   game: GameState,
   playerId: string,
   moves: MoveTurnAction[],
   bus: BusType
 ) {
   const player = findClonePlayer(game, playerId);
-  const handCopy = [...player.hand];
+  const playedCards = consumeMoveCards(player.hand, moves);
   const results = runMovePhase(player, moves, game, { scoreSubwaysAtEnd: false });
 
   moves.forEach((move, index) => {
     const result = results[index];
-    let label = actionLabel(move, handCopy);
+    const playedCard = playedCards[index];
+    let label = playedCard ? cardLabel(playedCard) : actionLabel(move, []);
     
     if (result.scoreChanges && Object.keys(result.scoreChanges).length > 0) {
       const parts: string[] = [];
@@ -390,6 +453,12 @@ function appendMoveLogActions(
         const tName = TEAM_NAMES_KO[colorTeam] || colorTeam;
         const dStr = delta > 0 ? `+${delta}` : `${delta}`;
         parts.push(`${tName.replace("팀", "")} ${dStr}`);
+        scoreDetails.push({
+          source: bus,
+          label: `${bus === BusType.BUS1 ? "버스 1" : "버스 2"} ${playedCard ? cardLabel(playedCard) : "이동"}`,
+          team: colorTeam,
+          points: delta,
+        });
       }
       if (parts.length > 0) {
         label += ` : ${parts.join(", ")}`;
@@ -405,6 +474,48 @@ function appendMoveLogActions(
     });
   });
 
+}
+
+function collectBusCardPlays(
+  game: GameState,
+  playerId: string,
+  moves: MoveTurnAction[],
+  source: BusType
+): LogCardPlay[] {
+  const player = findClonePlayer(game, playerId);
+  return consumeMoveCards(player.hand, moves).map((card) => ({
+    source,
+    playerId: player.id,
+    playerName: player.name,
+    team: player.team,
+    cardKind: card?.kind,
+    cardLabel: card ? cardLabel(card) : "이동",
+    count: card ? 1 : 0,
+  }));
+}
+
+function collectSubwayCardPlays(room: RoomState): LogCardPlay[] {
+  return getOrderedSubwaySubmissions(room).map((submission) => ({
+    source: "SUBWAY",
+    playerId: submission.playerId,
+    playerName: submission.playerName,
+    team: submission.team,
+    cardKind: submission.cardKind,
+    cardLabel: submission.cardKind ? subwayCardLabel(submission.cardKind) : "패스",
+    count: submission.cardKind ? 1 : 0,
+    submittedOrder: submission.submittedOrder,
+  }));
+}
+
+function consumeMoveCards(hand: Card[], moves: MoveTurnAction[]): (Card | undefined)[] {
+  const remaining = [...hand];
+  return moves.map((move) => {
+    if (move.cardIndex < 0 || move.cardIndex >= remaining.length) {
+      return undefined;
+    }
+    const [card] = remaining.splice(move.cardIndex, 1);
+    return card;
+  });
 }
 
 function appendSubwayLogAction(
@@ -443,14 +554,24 @@ function appendSubwayLogAction(
     scoreSubwaysAtEnd: false,
   });
 
+  actionDetails.push({
+    actionLabel: `${teamPrefix}${player.name ?? player.id} ${subwayLabel} ${subwayCardLabel(submission.cardKind)}`,
+    bus: BusType.BUS1,
+    applied: result.applied,
+    reason: result.reason,
+    scoreGained: 0,
+  });
+
   return result.applied;
 }
 
 function appendScoreDeltaLogActions(
   actionDetails: LogEntry["actions"],
+  scoreDetails: LogScoreDetail[],
   beforeScores: GameState["teamScores"],
   afterScores: GameState["teamScores"],
-  label: string
+  label: string,
+  source: LogScoreDetail["source"]
 ) {
   const parts: string[] = [];
   for (const team of Object.keys(afterScores) as (keyof GameState["teamScores"])[]) {
@@ -459,6 +580,12 @@ function appendScoreDeltaLogActions(
     const colorTeam = team as Colour;
     const tName = TEAM_NAMES_KO[colorTeam] || colorTeam;
     parts.push(`${tName.replace("팀", "")} ${delta > 0 ? `+${delta}` : delta}`);
+    scoreDetails.push({
+      source,
+      label,
+      team: colorTeam,
+      points: delta,
+    });
   }
   
   if (parts.length > 0) {
@@ -517,7 +644,8 @@ function addTurnLog(
   actions: LogEntry["actions"],
   round: number,
   turn: number,
-  phase: LogEntry["phase"]
+  phase: LogEntry["phase"],
+  details: Pick<LogEntry, "cardPlays" | "scoreDetails"> = {}
 ) {
   const { bus1Player, bus2Player, busTeam } = getTurnControllers(room.game);
   room.logs.unshift({
@@ -526,6 +654,8 @@ function addTurnLog(
     team: busTeam ?? "Blue",
     phase,
     actions,
+    cardPlays: details.cardPlays,
+    scoreDetails: details.scoreDetails,
     round,
     turn,
   });
